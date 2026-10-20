@@ -45,7 +45,14 @@ describe("helpers de productos", () => {
     it("redondea decimales correctamente", () => {
       const res = calcularAhorro(15.9, 9.9);
       expect(res.montoAhorro).toBe(6);
-      expect(res.porcentaje).toBe(38);
+      expect(res.porcentaje).toBe(37.7);
+    });
+
+    it("conserva un decimal en descuentos que no son enteros", () => {
+      expect(calcularAhorro(7, 4)).toEqual({ porcentaje: 42.9, montoAhorro: 3 });
+      expect(calcularAhorro(3, 2).porcentaje).toBe(33.3);
+      expect(calcularAhorro(100, 99.9).porcentaje).toBe(0.1);
+      expect(calcularAhorro(80, 39.96).porcentaje).toBe(50.1);
     });
 
     it("retorna 0 si el precio actual es mayor o igual al original", () => {

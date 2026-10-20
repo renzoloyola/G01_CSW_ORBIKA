@@ -10,17 +10,26 @@ export default function RecoverPassword() {
   const { recuperarContrasena } = useAuth();
   const { toast } = useToast();
   const [mensaje, setMensaje] = useState("");
+  const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
 
   async function alEnviar({ correo }) {
+    setMensaje("");
+    setError("");
     setCargando(true);
     try {
       await recuperarContrasena(correo);
-    } finally {
-      setCargando(false);
       const msg = "Si el correo está registrado, te hemos enviado un enlace para restablecer tu contraseña.";
       setMensaje(msg);
       toast.info(msg);
+    } catch (err) {
+      const msg = err.status === 429
+        ? "No pudimos enviar la solicitud. Espera unos minutos antes de intentarlo nuevamente."
+        : "No pudimos procesar la solicitud de recuperación. Inténtalo nuevamente más tarde.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setCargando(false);
     }
   }
 
@@ -61,6 +70,7 @@ export default function RecoverPassword() {
             </Button>
           </div>
 
+          {error && <p role="alert" className="p-3.5 bg-terra-pale text-terra rounded-xl text-xs sm:text-sm font-medium mt-3">{error}</p>}
           {mensaje && (
             <div
               role="status"

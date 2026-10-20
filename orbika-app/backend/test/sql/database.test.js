@@ -38,6 +38,8 @@ beforeAll(async () => {
   const legacy = await db.query("insert into public.pedidos(comprador_id,producto_id,cantidad,monto_total,modalidad_entrega) values($1,$2,1,5,'recojo') returning id", [buyer, expired.rows[0].id]);
   legacyPedido = legacy.rows[0].id;
   await db.exec(readFileSync(new URL("../../../supabase/migrations/003_srs_integrity_and_images.sql", import.meta.url), "utf8"));
+  await db.exec("create view public.descuentos_compatibilidad as select id,descuento_pct from public.productos_con_descuento; grant select on public.productos_con_descuento to authenticated;");
+  await db.exec(readFileSync(new URL("../../../supabase/migrations/004_discount_precision.sql", import.meta.url), "utf8"));
   await db.exec("grant select,update on public.perfiles to authenticated; grant select on public.pedidos,public.detalle_pedidos,public.productos to authenticated;");
 }, 30000);
 beforeEach(async () => {
@@ -49,6 +51,19 @@ afterEach(async () => { await db.exec("rollback;"); });
 afterAll(async () => { if (db) await db.close(); });
 
 describe("migraciones ejecutadas en PostgreSQL", () => {
+  it("calcula el descuento con un decimal sin eliminar la vista ni sus dependencias", async () => {
+    await db.query("update productos set precio_original=7,precio_actual=4 where id=$1", [productoId]);
+    const row = (await db.query("select descuento_pct,descuento_pct_entero,estado from productos_con_descuento where id=$1", [productoId])).rows[0];
+    expect(Number(row.descuento_pct)).toBe(42.9);
+    expect(Number(row.descuento_pct_entero)).toBe(43);
+    expect(row.estado).toBe("disponible");
+    const legacy = (await db.query("select descuento_pct from descuentos_compatibilidad where id=$1", [productoId])).rows[0];
+    expect(Number(legacy.descuento_pct)).toBe(43);
+    expect((await db.query("select has_table_privilege('authenticated','public.productos_con_descuento','select') as permitido")).rows[0].permitido).toBe(true);
+    expect((await db.query("select reloptions from pg_class where oid='public.productos_con_descuento'::regclass")).rows[0].reloptions).toContain("security_invoker=true");
+    await db.query("update productos set precio_original=80,precio_actual=39.96 where id=$1", [productoId]);
+    expect(Number((await db.query("select descuento_pct from productos_con_descuento where id=$1", [productoId])).rows[0].descuento_pct)).toBe(50.1);
+  });
   it("migra pedidos existentes sin inventar precio original ni peso históricos", async () => {
     const result = await db.query("select * from detalle_pedidos where pedido_id=$1", [legacyPedido]);
     expect(result.rows).toHaveLength(1);

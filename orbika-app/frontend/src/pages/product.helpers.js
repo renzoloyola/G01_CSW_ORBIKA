@@ -35,7 +35,13 @@ export function calcularAhorro(precioOriginal, precioActual) {
     return { porcentaje: 0, montoAhorro: 0 };
   }
   const montoAhorro = Number((orig - act).toFixed(2));
-  const porcentaje = Math.round(((orig - act) / orig) * 100);
+  // Los precios monetarios se expresan en céntimos para que los empates de
+  // redondeo coincidan con NUMERIC de PostgreSQL (por ejemplo, 50.05 → 50.1).
+  const originalCentimos = Math.round(orig * 100);
+  const actualCentimos = Math.round(act * 100);
+  const porcentaje = originalCentimos > 0
+    ? Math.round(((originalCentimos - actualCentimos) * 1000) / originalCentimos) / 10
+    : 0;
   return { porcentaje, montoAhorro };
 }
 

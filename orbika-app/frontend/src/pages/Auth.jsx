@@ -68,7 +68,7 @@ export default function Auth({ initialMode = "login" }) {
   const rol = watchRegister("rol");
   const [cargandoRegister, setCargandoRegister] = useState(false);
   const [errorRegister, setErrorRegister] = useState("");
-  const [registroExitoso, setRegistroExitoso] = useState(false);
+  const [resultadoRegistro, setResultadoRegistro] = useState(null);
 
   async function onRegister(datos) {
     setErrorRegister("");
@@ -80,13 +80,13 @@ export default function Auth({ initialMode = "login" }) {
 
     setCargandoRegister(true);
     try {
-      await registrarse(datos);
-      setRegistroExitoso(true);
-      toast.success("¡Tu cuenta fue creada con éxito!");
-      setTimeout(() => {
-        setRegistroExitoso(false);
-        cambiarModo("login");
-      }, 1500);
+      const resultado = await registrarse(datos);
+      setResultadoRegistro(resultado);
+      if (resultado.sesionIniciada) {
+        toast.success("¡Tu cuenta fue creada con éxito!");
+      } else {
+        toast.info("Revisa tu correo para continuar con el registro.");
+      }
     } catch (err) {
       const msg = err.message?.includes("already registered")
         ? "Este correo electrónico ya se encuentra registrado."
@@ -250,19 +250,31 @@ export default function Auth({ initialMode = "login" }) {
           {/* VISTA 2: CREAR CUENTA */}
           {modo === "register" && (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-              {registroExitoso ? (
-                <div className="py-8 text-center space-y-3 animate-in fade-in">
+              {resultadoRegistro ? (
+                <div role="status" aria-live="polite" className="py-8 text-center space-y-3 animate-in fade-in">
                   <div className="w-14 h-14 bg-moss/20 text-moss rounded-full flex items-center justify-center mx-auto">
                     <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
                   <h2 className="font-serif text-xl font-bold text-forest-deep">
-                    ¡Cuenta creada exitosamente!
+                    {resultadoRegistro.sesionIniciada ? "¡Cuenta creada exitosamente!" : "Revisa tu correo"}
                   </h2>
                   <p className="text-xs text-ink-soft">
-                    Pasando al inicio de sesión…
+                    {resultadoRegistro.sesionIniciada
+                      ? "Tu sesión está iniciada. Ya puedes explorar el catálogo."
+                      : "Si tu correo puede registrarse, recibirás un enlace para confirmar tu cuenta. Si ya tienes una cuenta, inicia sesión o recupera tu contraseña."}
                   </p>
+                  <Link
+                    to={resultadoRegistro.sesionIniciada ? "/catalogo" : "/iniciar-sesion"}
+                    className="inline-block text-sm text-forest font-semibold underline"
+                  >
+                    {resultadoRegistro.sesionIniciada ? "Explorar catálogo" : "Ir al inicio de sesión"}
+                  </Link>
+                  {!resultadoRegistro.sesionIniciada && <Link
+                    to="/recuperar-contrasena"
+                    className="block text-sm text-forest font-semibold underline"
+                  >Recuperar mi contraseña</Link>}
                 </div>
               ) : (
                 <form onSubmit={handleRegisterSubmit(onRegister)} className="space-y-4">

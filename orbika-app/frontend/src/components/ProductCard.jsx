@@ -19,7 +19,7 @@ export default function ProductCard({ producto }) {
   const vencimiento = calcularEstadoVencimiento(producto.fecha_vencimiento);
   const stockInfo = calcularNivelStock(producto.stock);
 
-  const porcentajeDescuento = producto.descuento_pct || ahorro.porcentaje;
+  const porcentajeDescuento = ahorro.porcentaje;
 
   return (
     <Link

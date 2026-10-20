@@ -5,6 +5,13 @@ comercial y mantiene diez casos de uso pendientes. Este registro actualiza el
 alcance que debe declararse en FD04, FD05 y FD06: el avance local no demuestra
 cumplimiento integral ni aceptación en un entorno remoto.
 
+Actualización del 19/10/2026: se corrigieron la confirmación del registro sin
+sesión y el manejo de errores de recuperación; el descuento usa un decimal en
+la interfaz y en la migración 004. El detalle de análisis, diseño, implementación
+y pruebas, junto con la aceptación remota pendiente, está en
+[sprints-01-02.md](sprints-01-02.md). Las referencias a tres migraciones más abajo
+describen la revisión inicial; una instalación actual debe aplicar también 004.
+
 ## Arquitectura del código
 
 La interfaz utiliza React 18, Vite, Tailwind y React Router. Las páginas se cargan

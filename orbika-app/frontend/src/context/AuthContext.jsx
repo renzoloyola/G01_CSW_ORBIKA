@@ -52,7 +52,7 @@ export function AuthProvider({ children }) {
   // el trigger manejar_nuevo_usuario() de Supabase crea la fila en "perfiles".
   async function registrarse({ nombre, correo, contrasena, rol, telefono, nombreNegocio, ubicacion }) {
     exigirModoNormal();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: correo,
       password: contrasena,
       options: { data: {
@@ -64,6 +64,10 @@ export function AuthProvider({ children }) {
       } },
     });
     if (error) throw error;
+    if (!data?.user) throw new Error("No se pudo procesar el registro. Inténtalo nuevamente.");
+    // Sin sesión, Auth puede devolver tanto un registro por confirmar como una
+    // respuesta que oculta una cuenta existente. No afirmar que se creó la cuenta.
+    return { sesionIniciada: Boolean(data.session) };
   }
 
   // CU-02: Iniciar sesión.

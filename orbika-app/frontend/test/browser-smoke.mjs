@@ -15,6 +15,12 @@ const producto = { id: 501, nombre: "Alimento de prueba", descripcion: "Oferta d
   fecha_vencimiento: "2099-01-01", stock: 3, estado: "disponible", categoria_id: 1,
   categorias: { nombre: "Panadería" }, vendedor_id: "seller", perfiles: { nombre_negocio: "Comercio de prueba", ubicacion: "Tacna" },
   modalidad_entrega: "recojo", zona: "Tacna", foto_url: null };
+function authSession(actor, email) {
+  const user = { id: actor, email, aud: "authenticated", role: "authenticated", app_metadata: { provider: "email" }, user_metadata: {}, identities: [{ provider: "email" }], created_at: new Date().toISOString() };
+  const enc = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  return { access_token: `${enc({ alg: "HS256", typ: "JWT" })}.${enc({ sub: actor, aud: "authenticated", role: "authenticated", exp })}.test`, token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: "test-refresh", user };
+}
 async function start(port, demo) {
   const proc = spawn(process.execPath, [path.join(root, "node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     cwd: root, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
@@ -34,7 +40,7 @@ async function start(port, demo) {
 }
 async function setup(origin) {
   const context = await browser.newContext();
-  const state = { actor: "buyer", catalogo: [producto], catalogError: false, rejectCompra: true, rejectPublicacion: true, compras: [], publicaciones: [], imagenes: 0, apiCalls: 0, supabaseCalls: 0 };
+  const state = { actor: "buyer", signupMode: "pending", recoveryError: false, signupRequests: [], catalogo: [producto], catalogError: false, rejectCompra: true, rejectPublicacion: true, compras: [], publicaciones: [], imagenes: 0, apiCalls: 0, supabaseCalls: 0 };
   await context.route("**/*", async (route) => {
     const req = route.request(); const url = new URL(req.url());
     if (url.origin === origin) return route.continue();
@@ -45,11 +51,19 @@ async function setup(origin) {
       if (url.pathname === "/auth/v1/token") {
         const email = req.postDataJSON().email;
         state.actor = email.startsWith("seller") ? "seller" : "buyer";
-        const user = { id: state.actor, email, aud: "authenticated", role: "authenticated", app_metadata: { provider: "email" }, user_metadata: {}, created_at: new Date().toISOString() };
-        const enc = (value) => Buffer.from(JSON.stringify(value)).toString("base64url");
-        const exp = Math.floor(Date.now() / 1000) + 3600;
-        return json({ access_token: `${enc({ alg: "HS256", typ: "JWT" })}.${enc({ sub: state.actor, aud: "authenticated", role: "authenticated", exp })}.test`, token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: "test-refresh", user });
+        return json(authSession(state.actor, email));
       }
+      if (url.pathname === "/auth/v1/signup") {
+        const input = req.postDataJSON();
+        state.signupRequests.push(input);
+        if (state.signupMode === "duplicate-error") return json({ msg: "User already registered", code: "user_already_exists" }, 422);
+        state.actor = input.data?.rol === "vendedor" ? "seller" : "buyer";
+        const session = authSession(state.actor, input.email);
+        if (state.signupMode === "active") return json(session);
+        return json({ ...session.user, identities: state.signupMode === "obfuscated" ? [] : session.user.identities });
+      }
+      if (url.pathname === "/auth/v1/recover") return state.recoveryError
+        ? json({ msg: "Too many requests", code: "over_email_send_rate_limit" }, 429) : json({});
       if (url.pathname === "/rest/v1/perfiles") return json({ id: state.actor, nombre: "Cuenta de prueba", rol: state.actor === "seller" ? "vendedor" : "comprador", activo: true });
       if (url.pathname === "/rest/v1/categorias") return json([{ id: 1, nombre: "Panadería" }]);
       return json({});
@@ -92,10 +106,80 @@ async function login(page, origin, actor) {
   await page.getByRole("button", { name: "Ingresar a mi cuenta", exact: true }).click();
   await page.getByText("Cuenta de prueba", { exact: true }).first().waitFor();
 }
+async function registrar(page, origin, email = "signup@example.test") {
+  await page.goto(`${origin}/registrarse`);
+  await page.locator('[name="nombre"]').fill("Cuenta de registro");
+  await page.locator('[name="correo"]').fill(email);
+  await page.locator('[name="contrasena"]').fill("TestPassword123!");
+  await page.getByRole("button", { name: "Completar registro", exact: true }).click();
+}
+async function comprobarSprint1(origin) {
+  for (const mode of ["pending", "obfuscated", "active", "duplicate-error"]) {
+    const t = await setup(origin);
+    try {
+      t.state.signupMode = mode;
+      await registrar(t.page, origin);
+      if (mode === "active") {
+        await t.page.getByRole("heading", { name: "¡Cuenta creada exitosamente!", exact: true }).waitFor();
+        await t.page.getByRole("link", { name: "Explorar catálogo", exact: true }).click();
+        await t.page.waitForURL(`${origin}/catalogo`);
+      } else if (mode === "duplicate-error") {
+        await t.page.getByRole("alert").filter({ hasText: "Este correo electrónico ya se encuentra registrado." }).first().waitFor();
+      } else {
+        await t.page.getByRole("heading", { name: "Revisa tu correo", exact: true }).waitFor();
+        assert.equal(await t.page.getByText(/cuenta.*creada/i).count(), 0);
+        await t.page.getByRole("link", { name: "Recuperar mi contraseña", exact: true }).waitFor();
+        const mensaje = "Si tu correo puede registrarse, recibirás un enlace para confirmar tu cuenta. Si ya tienes una cuenta, inicia sesión o recupera tu contraseña.";
+        await t.page.getByText(mensaje, { exact: true }).waitFor();
+      }
+      assert.equal(t.state.signupRequests.length, 1);
+      assert.equal(t.state.signupRequests[0].data.rol, "comprador");
+      assert.deepEqual(t.errors, []);
+    } finally { await t.context.close(); }
+  }
+
+  const recovery = await setup(origin);
+  try {
+    const { page, state } = recovery;
+    const enviar = page.getByRole("button", { name: "Enviar enlace de recuperación", exact: true });
+    const success = "Si el correo está registrado, te hemos enviado un enlace para restablecer tu contraseña.";
+    const rateError = "No pudimos enviar la solicitud. Espera unos minutos antes de intentarlo nuevamente.";
+    await page.goto(`${origin}/recuperar-contrasena`);
+    await page.locator('[name="correo"]').fill("recover@example.test");
+    // Comprueba éxito, fallo posterior y reintento sin mensajes anteriores.
+    await enviar.click();
+    await page.locator("main").getByRole("status").filter({ hasText: success }).waitFor();
+    state.recoveryError = true;
+    await enviar.click();
+    await page.getByRole("alert").filter({ hasText: rateError }).first().waitFor();
+    assert.equal(await page.locator("main").getByText(success, { exact: true }).count(), 0);
+    assert.equal(await enviar.isEnabled(), true);
+    state.recoveryError = false;
+    await enviar.click();
+    await page.locator("main").getByRole("status").filter({ hasText: success }).waitFor();
+    assert.equal(await page.locator("main").getByRole("alert").count(), 0);
+    assert.deepEqual(recovery.errors, []);
+  } finally { await recovery.context.close(); }
+
+  const access = await setup(origin);
+  try {
+    await access.page.goto(`${origin}/publicar`);
+    await access.page.waitForURL(`${origin}/iniciar-sesion`);
+    await login(access.page, origin, "buyer");
+    await access.page.goto(`${origin}/publicar`);
+    await access.page.waitForURL(`${origin}/`);
+    await access.page.getByRole("button", { name: "Salir", exact: true }).click();
+    await access.page.goto(`${origin}/mis-pedidos`);
+    await access.page.waitForURL(`${origin}/iniciar-sesion`);
+    assert.deepEqual(access.errors, []);
+  } finally { await access.context.close(); }
+  console.log("PASS sprint 1: registro pendiente/obfuscado/activo/duplicado, recuperación con fallo y reintento, roles y cierre local");
+}
 try {
   const liveOrigin = await start(5187, false);
   const demoOrigin = await start(5188, true);
   browser = await chromium.launch({ channel: process.env.ORBIKA_BROWSER_CHANNEL || "msedge", headless: true });
+  await comprobarSprint1(liveOrigin);
   const live = await setup(liveOrigin);
   const { page, state } = live;
   state.catalogo = [];
@@ -136,11 +220,18 @@ try {
 
   const seller = await setup(liveOrigin);
   await login(seller.page, liveOrigin, "seller");
+  // Una respuesta antigua con descuento entero no debe volver a degradar la tarjeta.
+  seller.state.catalogo = [{ ...producto, precio_original: 7, precio_actual: 4, descuento_pct: 43 }];
+  await seller.page.goto(`${liveOrigin}/catalogo`);
+  await seller.page.locator("main").getByText("-42.9%", { exact: true }).waitFor();
   await seller.page.goto(`${liveOrigin}/publicar`);
   for (const [name, value] of Object.entries({ nombre: "Pan de prueba", precioOriginal: "10", precioActual: "5", stock: "2", fechaVencimiento: "2099-01-01", zona: "Tacna" })) {
     await seller.page.locator(`[name="${name}"]`).fill(value);
   }
   await seller.page.locator('[name="categoriaId"]').selectOption("1");
+  await seller.page.locator('[name="precioOriginal"]').fill("7");
+  await seller.page.locator('[name="precioActual"]').fill("4");
+  await seller.page.getByText("42.9% OFF", { exact: true }).waitFor();
   await seller.page.locator('input[type="file"]').setInputFiles({ name: "prueba.png", mimeType: "image/png", buffer: png });
   await seller.page.getByRole("button", { name: "Publicar en el catálogo", exact: true }).click();
   await seller.page.getByText("Publicación rechazada", { exact: true }).waitFor();

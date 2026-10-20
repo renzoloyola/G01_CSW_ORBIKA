@@ -21,6 +21,7 @@ contienen afirmaciones de alcance que deben sustituirse en una próxima entrega.
    - `supabase/migrations/001_init_schema.sql`
    - `supabase/migrations/002_security_and_order_transactions.sql`
    - `supabase/migrations/003_srs_integrity_and_images.sql`
+   - `supabase/migrations/004_discount_precision.sql`
 3. Ejecutar opcionalmente `supabase/seed.sql` para cargar categorías.
 4. Copiar los archivos `.env.example` a `.env` en frontend y backend y completar
    las variables del proyecto. La clave `service_role` se usa solo en el backend.
@@ -43,13 +44,17 @@ npm run dev
 
 API: `http://localhost:4000/api`; frontend: `http://localhost:5173`.
 
-Si la base ya tiene 001 y 002, aplicar solamente 003 antes de iniciar el código
-actual. Esta migración cambia la relación producto/pedido y la firma de la RPC
+Si la base ya tiene 001 y 002, aplicar 003 y luego 004. Si ya tiene 003, aplicar
+solo 004. La migración 003 cambia la relación producto/pedido y la firma de la RPC
 de compra. Debe coordinarse con la actualización del backend y frontend.
 En una base con datos importantes, obtener una copia de seguridad y comprobar
 primero la migración en un entorno de pruebas. La migración es transaccional:
 si encuentra más de un detalle para un pedido, la restricción de unicidad aborta
 el cambio para que esos registros puedan revisarse sin eliminar historial.
+
+La migración 004 añade el descuento con un decimal conservando permisos y
+dependencias de la vista. `descuento_pct` pasa a ser decimal; la columna anterior
+se conserva como `descuento_pct_entero` para dependencias SQL existentes.
 
 ## Operaciones reales y demostración
 
@@ -104,6 +109,12 @@ el valor de los pedidos, no pagos electrónicos acreditados por ÓrbiKa.
 
 ## Recuperación de contraseña
 
+El registro sin sesión muestra instrucciones para revisar el correo; no afirma
+que se creó la cuenta porque Auth también puede ocultar un correo ya existente.
+Si el registro devuelve sesión, el usuario puede continuar al catálogo. La
+recuperación captura rechazos del proveedor y permite reintentar sin mostrar
+un mensaje de envío exitoso en el formulario cuando falla la solicitud.
+
 Configurar en Supabase Auth el Site URL y la URL permitida
 `http://localhost:5173/actualizar-contrasena` (o su equivalente del despliegue).
 Configurar la expiración del enlace de recuperación en 1800 segundos para cumplir
@@ -114,7 +125,7 @@ los tokens de acceso emitidos pueden seguir vigentes hasta su expiración.
 
 ## Datos de prueba persistidos
 
-Después de las tres migraciones, únicamente en una base de desarrollo:
+Después de las cuatro migraciones, únicamente en una base de desarrollo:
 
 ```powershell
 cd backend
@@ -160,10 +171,14 @@ Si Playwright se proporciona mediante un runtime externo, establecer
 `ORBIKA_PLAYWRIGHT_ENTRYPOINT` con la ruta absoluta a su `index.mjs`.
 `ORBIKA_BROWSER_CHANNEL` permite elegir el canal (predeterminado: `msedge`).
 
-Antes del piloto se requiere aplicar 003 en Supabase de pruebas y validar allí
+Antes del piloto se requiere aplicar las migraciones pendientes hasta 004 en Supabase de pruebas y validar allí
 PostgREST, autenticación real, Storage, recuperación por correo y compras
 simultáneas. Los resultados locales no acreditan rendimiento, disponibilidad
 mensual, aceptación de usuarios ni cumplimiento de los 21 casos de uso.
+
+La trazabilidad y la aceptación pendiente de los primeros sprints están en
+[sprints-01-02.md](docs/sprints-01-02.md), organizadas en análisis, diseño,
+implementación y pruebas.
 
 ## Funciones pendientes
 
