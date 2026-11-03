@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { DEMO_MODE, marketplace, mensajeError } from "../services/marketplace";
 import { Button } from "./ui";
-import { calcularAhorro, calcularEstadoVencimiento } from "../pages/product.helpers";
+import { calcularAhorro, calcularEstadoVencimiento, diasHastaVencimiento, validarUrlFoto } from "../pages/product.helpers";
 
 const campo =
   "w-full border border-gray-300 rounded-xl px-3.5 py-2.5 mt-1 bg-white text-ink text-sm placeholder:text-ink-soft/40 focus:outline-none focus:ring-2 focus:ring-moss/40 focus:border-moss transition-all";
@@ -46,6 +46,8 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
   const fileInputRef = useRef(null);
   const [archivoFoto, setArchivoFoto] = useState(null);
   const [vistaPrevia, setVistaPrevia] = useState("");
+  const [imagenCargada, setImagenCargada] = useState("");
+  const [imagenFallida, setImagenFallida] = useState("");
 
   useEffect(() => {
     if (!archivoFoto) { setVistaPrevia(""); return; }
@@ -67,6 +69,9 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
   const actual = watch("precioActual");
   const fechaVenc = watch("fechaVencimiento");
   const fotoUrl = watch("fotoUrl");
+  const fuenteFoto = vistaPrevia || fotoUrl?.trim() || "";
+  const urlFotoValida = validarUrlFoto(fotoUrl);
+  const mostrarVistaPrevia = fuenteFoto && (vistaPrevia || urlFotoValida === true);
 
   const ahorro = calcularAhorro(original, actual);
   const vencimiento = fechaVenc ? calcularEstadoVencimiento(fechaVenc) : null;
@@ -133,7 +138,10 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
 
   return (
     <form
-      onSubmit={handleSubmit(enviar)}
+      onSubmit={(event) => {
+        setError("");
+        return handleSubmit(enviar)(event);
+      }}
       className="space-y-6 bg-card border border-sage/40 rounded-3xl shadow-card p-6 sm:p-8"
     >
       {/* Botón de Autocompletado rápido para demostración / grabación */}
@@ -269,8 +277,14 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
               type="date"
               disabled={editing}
               className={campo}
-              {...register("fechaVencimiento", { required: true })}
+              {...register("fechaVencimiento", {
+                required: "Selecciona una fecha de vencimiento.",
+                validate: (value) => editing || diasHastaVencimiento(value) > 0 || "La fecha de vencimiento debe ser posterior a hoy.",
+              })}
             />
+            {errors.fechaVencimiento && (
+              <p role="alert" className="text-terra text-xs mt-1 font-medium">{errors.fechaVencimiento.message}</p>
+            )}
             {vencimiento && (
               <p
                 className={`text-xs mt-1.5 font-medium ${
@@ -406,23 +420,33 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
               type="text"
               className={campo}
               placeholder="https://ejemplo.com/foto-alimento.jpg"
-              {...register("fotoUrl", { onChange: () => setArchivoFoto(null) })}
+              {...register("fotoUrl", { validate: validarUrlFoto, onChange: () => setArchivoFoto(null) })}
             />
+            {urlFotoValida !== true && (
+              <p role="alert" className="text-terra text-xs mt-1 font-medium">{urlFotoValida}</p>
+            )}
           </div>
 
-          {(fotoUrl || vistaPrevia) && (
+          {mostrarVistaPrevia && (
             <div className="flex items-center gap-3 bg-paper-warm p-3 rounded-2xl border border-sage/30 animate-in fade-in">
               <img
-                src={vistaPrevia || fotoUrl}
+                key={fuenteFoto}
+                src={fuenteFoto}
                 alt="Vista previa"
                 className="w-16 h-16 object-cover rounded-xl shrink-0 border border-gray-200 shadow-xs"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                }}
+                hidden={imagenFallida === fuenteFoto}
+                onLoad={() => { setImagenCargada(fuenteFoto); setImagenFallida(""); }}
+                onError={() => { setImagenFallida(fuenteFoto); setImagenCargada(""); }}
               />
               <div className="text-xs text-ink-soft">
-                <p className="font-semibold text-forest-deep">Fotografía seleccionada correctamente</p>
-                <p className="text-[11px]">Se mostrará en la tarjeta de producto del catálogo.</p>
+                {imagenFallida === fuenteFoto ? (
+                  <p role="alert" className="font-semibold text-terra">No se pudo cargar la fotografía. Revisa el enlace o elige otra imagen.</p>
+                ) : imagenCargada === fuenteFoto ? (
+                  <>
+                    <p className="font-semibold text-forest-deep">Fotografía seleccionada correctamente</p>
+                    <p className="text-[11px]">Se mostrará en la tarjeta de producto del catálogo.</p>
+                  </>
+                ) : <p>Comprobando fotografía…</p>}
               </div>
             </div>
           )}

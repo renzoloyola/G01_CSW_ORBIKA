@@ -52,7 +52,9 @@ create policy "Detalles: participantes leen" on public.detalle_pedidos for selec
 
 drop function public.crear_pedido_transaccion(bigint, uuid, int, text, text);
 drop function public.cancelar_pedido_transaccion(bigint, uuid, text);
-alter table public.pedidos drop column producto_id;
+-- Conserva la referencia antigua para auditoría; las compras nuevas usan el detalle.
+alter table public.pedidos rename column producto_id to producto_id_legacy;
+alter table public.pedidos alter column producto_id_legacy drop not null;
 
 create or replace function public.proteger_rol_perfil()
 returns trigger language plpgsql set search_path = public as $$

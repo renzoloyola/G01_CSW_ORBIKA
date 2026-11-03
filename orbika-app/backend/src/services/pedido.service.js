@@ -38,6 +38,7 @@ export async function crearPedido(actor, input, db = supabaseAdmin) {
 }
 
 export async function listarPedidosDeUsuario(usuarioId, rol, db = supabaseAdmin) {
+  if (!["comprador", "vendedor"].includes(rol)) throw new AppError(403, "FORBIDDEN", "No tienes acceso a pedidos.");
   let query = db.from("pedidos");
   const relacion = rol === "vendedor"
     ? "*, detalle_pedidos!inner(*, productos!inner(nombre, foto_url, vendedor_id))"
@@ -47,7 +48,13 @@ export async function listarPedidosDeUsuario(usuarioId, rol, db = supabaseAdmin)
   else if (rol === "comprador") query = query.eq("comprador_id", usuarioId);
   else throw new AppError(403, "FORBIDDEN", "No tienes acceso a pedidos.");
   const { data, error } = await query.order("fecha_creacion", { ascending: false });
-  if (error) throw conflicto(error);
+  if (error) {
+    console.error("[pedidos:lectura]", { code: error.code });
+    if (["PGRST200", "PGRST201", "42703", "42P01"].includes(error.code)) {
+      throw new AppError(503, "ORDER_SCHEMA_NOT_READY", "El historial de pedidos no está disponible temporalmente. Contacta al administrador para revisar la configuración del servicio.");
+    }
+    throw new AppError(502, "ORDER_QUERY_FAILED", "No se pudieron cargar los pedidos. Reintenta en unos momentos.");
+  }
   return (data || []).map((pedido) => ({
     ...pedido,
     productos: { ...detalleDe(pedido)?.productos,

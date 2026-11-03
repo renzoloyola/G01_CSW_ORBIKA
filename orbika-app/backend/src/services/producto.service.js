@@ -23,6 +23,18 @@ function aColumnas(datos) {
 }
 
 export async function buscarProductos(filtros = {}, db = supabaseAdmin, hoy = fechaHoyLima()) {
+  for (const campo of ["busqueda", "zona", "orden"]) {
+    if (filtros[campo] != null && typeof filtros[campo] !== "string") {
+      throw new AppError(400, "VALIDATION_ERROR", "Los filtros de búsqueda no son válidos.");
+    }
+  }
+  if (filtros.busqueda?.trim().length > 80 || filtros.zona?.trim().length > 100) {
+    throw new AppError(400, "VALIDATION_ERROR", "La búsqueda admite hasta 80 caracteres y la zona hasta 100.");
+  }
+  if (filtros.categoriaId != null && typeof filtros.categoriaId === "object"
+    || filtros.maxPrecio != null && typeof filtros.maxPrecio === "object") {
+    throw new AppError(400, "VALIDATION_ERROR", "Categoría o precio máximo inválidos.");
+  }
   let query = db.from("productos_con_descuento")
     .select("*, categorias(nombre), perfiles!productos_vendedor_id_fkey(nombre_negocio)")
     .in("estado", ["disponible", "proximo_a_vencer"])
@@ -49,8 +61,9 @@ export async function buscarProductos(filtros = {}, db = supabaseAdmin, hoy = fe
 
 export async function obtenerProducto(id, db = supabaseAdmin) {
   const { data, error } = await db.from("productos_con_descuento")
-    .select("*, categorias(nombre), perfiles!productos_vendedor_id_fkey(nombre_negocio, ubicacion)")
+    .select("*, categorias(nombre), perfiles!productos_vendedor_id_fkey(nombre, nombre_negocio, ubicacion)")
     .eq("id", idValido(id, "Producto")).single();
+  if (error && error.code !== "PGRST116") throw new AppError(502, "PRODUCT_QUERY_FAILED", "No se pudo cargar el producto. Reintenta en unos momentos.");
   if (error || !data) throw new AppError(404, "PRODUCT_NOT_FOUND", "Producto no encontrado.");
   return data;
 }

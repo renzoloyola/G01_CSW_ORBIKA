@@ -10,6 +10,9 @@ import {
 const claveIdempotencia = "a2000000-0000-4000-8000-000000000001";
 
 describe("validación de pedidos", () => {
+  it.each([true, [1], {}, 2147483648, Number.MAX_SAFE_INTEGER + 1])("rechaza cantidades que PostgreSQL no puede recibir: %j", (cantidad) => {
+    expect(() => validarCompra({ claveIdempotencia, productoId: 1, cantidad, modalidadEntrega: "recojo" })).toThrow("cantidad");
+  });
   it("normaliza una compra válida", () => {
     expect(validarCompra({ claveIdempotencia, productoId: "3", cantidad: "2", modalidadEntrega: "recojo" }))
       .toEqual({ claveIdempotencia, productoId: 3, cantidad: 2, modalidadEntrega: "recojo", referenciaEntrega: null });

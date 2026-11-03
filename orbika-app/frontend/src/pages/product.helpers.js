@@ -25,6 +25,14 @@ export function fechaLocal(fecha) {
   return `${day}/${month}/${year}`;
 }
 
+export function validarUrlFoto(value) {
+  if (!value?.trim()) return true;
+  try {
+    if (["http:", "https:"].includes(new URL(value.trim()).protocol)) return true;
+  } catch { /* Se muestra el mismo mensaje para cualquier URL inválida. */ }
+  return "La foto debe ser una URL http o https válida.";
+}
+
 /**
  * Calcula porcentaje y monto ahorrado en soles.
  */

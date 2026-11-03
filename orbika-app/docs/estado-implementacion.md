@@ -1,5 +1,19 @@
 # Estado de implementación de ÓrbiKa
 
+Actualización del 30/10/2026: el [sprint 4](sprint-04.md) completa las comprobaciones
+locales de RF-07, refuerza la confirmación de compra y la validación de cantidad,
+y consulta el stock persistido después de comprar. Se verificaron bloqueos y
+reintentos con conexiones independientes de PostgreSQL 18.6, además de las
+respuestas HTTP 201/409 sobre esa base temporal. La identidad usada en el ensayo
+es ficticia; sigue pendiente la aceptación con cuentas reales en Supabase.
+
+Actualización del 25/10/2026: Supabase ya fue actualizado hasta 004 el 24/10;
+la lectura remota de ventas se verificó para dos vendedores y seis pedidos.
+El [sprint 3](sprint-03.md) incorpora correcciones de filtros, carga y detalle,
+pruebas de navegador y mediciones de rendimiento locales y con Supabase real.
+Los párrafos posteriores que indican que la migración remota no se aplicó
+corresponden a la revisión histórica del 9/10, no al estado actual.
+
 Revisión técnica del 9 de octubre de 2026. El producto contiene parte del núcleo
 comercial y mantiene diez casos de uso pendientes. Este registro actualiza el
 alcance que debe declararse en FD04, FD05 y FD06: el avance local no demuestra

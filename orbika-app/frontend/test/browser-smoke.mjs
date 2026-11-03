@@ -5,6 +5,12 @@ import { mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
+import { comprobarSprint3 } from "./sprint3-checks.mjs";
+import { comprobarSprint4 } from "./sprint4-checks.mjs";
+const sprint3 = process.argv.includes("--sprint3");
+const sprint4 = process.argv.includes("--sprint4");
+const produccion = sprint3 || sprint4;
+const buildDir = `test-results/sprint${sprint4 ? 4 : 3}-build`;
 const { chromium } = await import(process.env.ORBIKA_PLAYWRIGHT_ENTRYPOINT
   ? pathToFileURL(process.env.ORBIKA_PLAYWRIGHT_ENTRYPOINT).href : "playwright");
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -22,9 +28,20 @@ function authSession(actor, email) {
   return { access_token: `${enc({ alg: "HS256", typ: "JWT" })}.${enc({ sub: actor, aud: "authenticated", role: "authenticated", exp })}.test`, token_type: "bearer", expires_in: 3600, expires_at: exp, refresh_token: "test-refresh", user };
 }
 async function start(port, demo) {
-  const proc = spawn(process.execPath, [path.join(root, "node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
+  const env = { ...process.env, VITE_DEMO_MODE: String(demo), VITE_SUPABASE_URL: "http://127.0.0.1:54329", VITE_SUPABASE_ANON_KEY: "local-test-key", VITE_API_URL: "http://127.0.0.1:4019/api" };
+  if (produccion) {
+    await new Promise((resolve, reject) => {
+      const build = spawn(process.execPath, [path.join(root, "node_modules/vite/bin/vite.js"), "build", "--outDir", buildDir], { cwd: root, windowsHide: true, env, stdio: "pipe" });
+      let output = "";
+      build.stdout.on("data", (d) => { output += d; });
+      build.stderr.on("data", (d) => { output += d; });
+      build.on("error", reject);
+      build.on("exit", (code) => code === 0 ? resolve() : reject(new Error(output)));
+    });
+  }
+  const proc = spawn(process.execPath, [path.join(root, "node_modules/vite/bin/vite.js"), ...(produccion ? ["preview", "--outDir", buildDir] : []), "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
     cwd: root, windowsHide: true, stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, VITE_DEMO_MODE: String(demo), VITE_SUPABASE_URL: "http://127.0.0.1:54329", VITE_SUPABASE_ANON_KEY: "local-test-key", VITE_API_URL: "http://127.0.0.1:4019/api" },
+    env,
   });
   servers.push(proc);
   let output = "";
@@ -40,7 +57,12 @@ async function start(port, demo) {
 }
 async function setup(origin) {
   const context = await browser.newContext();
+<<<<<<< HEAD
   const state = { actor: "buyer", signupMode: "pending", recoveryError: false, signupRequests: [], catalogo: [producto], catalogError: false, rejectCompra: true, rejectPublicacion: true, compras: [], publicaciones: [], imagenes: 0, apiCalls: 0, supabaseCalls: 0 };
+=======
+  const state = { actor: "buyer", signupMode: "pending", recoveryError: false, signupRequests: [], catalogo: [producto], pedidos: [], pedidoError: false, categoriasError: false, catalogRequests: [], delay: 0, slowSearch: null, catalogError: false, rejectCompra: true, rejectPublicacion: true, compras: [], publicaciones: [], imagenes: 0, apiCalls: 0, supabaseCalls: 0 };
+  state.comprasConfirmadas = new Map();
+>>>>>>> b8cc668 (App con 4 sprints + semana 1 y 2)
   await context.route("**/*", async (route) => {
     const req = route.request(); const url = new URL(req.url());
     if (url.origin === origin) return route.continue();
@@ -65,18 +87,46 @@ async function setup(origin) {
       if (url.pathname === "/auth/v1/recover") return state.recoveryError
         ? json({ msg: "Too many requests", code: "over_email_send_rate_limit" }, 429) : json({});
       if (url.pathname === "/rest/v1/perfiles") return json({ id: state.actor, nombre: "Cuenta de prueba", rol: state.actor === "seller" ? "vendedor" : "comprador", activo: true });
-      if (url.pathname === "/rest/v1/categorias") return json([{ id: 1, nombre: "Panadería" }]);
+      if (url.pathname === "/rest/v1/categorias") return state.categoriasError ? json({ message: "Error de categorías" }, 503) : json([{ id: 1, nombre: "Panadería" }, { id: 2, nombre: "Frutas" }]);
       return json({});
     }
     if (url.port === "4019") {
       state.apiCalls++;
-      if (url.pathname === "/api/productos" && req.method() === "GET") return state.catalogError ? json({ error: "Catálogo sin conexión" }, 503) : json(state.catalogo);
-      if (url.pathname === "/api/productos/501" && req.method() === "GET") return json(producto);
+      if (url.pathname === "/api/productos" && req.method() === "GET") {
+        const f = Object.fromEntries(url.searchParams);
+        state.catalogRequests.push(f);
+        const filtered = state.catalogo.filter((p) => (!f.busqueda || p.nombre.toLowerCase().includes(f.busqueda.toLowerCase()))
+          && (!f.categoriaId || p.categoria_id === Number(f.categoriaId))
+          && (!f.zona || p.zona.toLowerCase() === f.zona.toLowerCase())
+          && (!f.maxPrecio || p.precio_actual <= Number(f.maxPrecio)))
+          .sort((a, b) => f.orden === "precio_asc" ? a.precio_actual - b.precio_actual
+            : f.orden === "mayor_descuento" ? (1-b.precio_actual/b.precio_original)-(1-a.precio_actual/a.precio_original) : b.id-a.id);
+        if (state.slowSearch === f.busqueda) await new Promise((r) => { state.releaseSlow = r; });
+        if (state.delay) await new Promise((r) => setTimeout(r, state.delay));
+        return state.catalogError ? json({ error: "Catálogo sin conexión" }, 503) : json(filtered);
+      }
+      if (url.pathname === "/api/productos/501" && req.method() === "GET") {
+        if (state.delay) await new Promise((r) => setTimeout(r, state.delay));
+        if (state.detailError) return json({ error: "No se pudo actualizar la oferta" }, 503);
+        return json(state.catalogo.find((p) => p.id === 501) || producto);
+      }
       if (url.pathname.startsWith("/api/productos/") && req.method() === "GET") return json({ error: "Producto no encontrado" }, 404);
-      if (url.pathname === "/api/pedidos" && req.method() === "GET") return json([]);
+      if (url.pathname === "/api/pedidos" && req.method() === "GET") return state.pedidoError ? json({ error: "El historial de pedidos no está disponible temporalmente.", code: "ORDER_SCHEMA_NOT_READY" }, 503) : json(state.pedidos);
       if (url.pathname === "/api/pedidos" && req.method() === "POST") {
-        state.compras.push(req.postDataJSON());
-        return state.rejectCompra ? json({ error: "Stock insuficiente" }, 409) : json({ id: 901, estado: "creado", monto_total: 5 });
+        const datos = req.postDataJSON();
+        state.compras.push(datos);
+        if (state.holdCompra) await new Promise((r) => { state.releaseCompra = r; });
+        if (state.rejectCompra) return json({ error: "Stock insuficiente" }, 409);
+        let pedido = state.comprasConfirmadas.get(datos.claveIdempotencia);
+        if (!pedido) {
+          const oferta = state.catalogo.find((p) => p.id === datos.productoId);
+          pedido = { id: 901 + state.comprasConfirmadas.size, estado: "creado", monto_total: oferta.precio_actual * datos.cantidad };
+          state.comprasConfirmadas.set(datos.claveIdempotencia, pedido);
+          state.catalogo = state.catalogo.map((p) => p.id === datos.productoId
+            ? { ...p, stock: p.stock - datos.cantidad - (state.otraCompra || 0) } : p);
+        }
+        if (state.loseResponse) { state.loseResponse = false; return route.abort("failed"); }
+        return json(pedido, 201);
       }
       if (url.pathname === "/api/imagenes") {
         assert.equal(req.headers()["content-type"], "image/png");
@@ -177,8 +227,16 @@ async function comprobarSprint1(origin) {
 }
 try {
   const liveOrigin = await start(5187, false);
-  const demoOrigin = await start(5188, true);
+  const demoOrigin = produccion ? null : await start(5188, true);
   browser = await chromium.launch({ channel: process.env.ORBIKA_BROWSER_CHANNEL || "msedge", headless: true });
+<<<<<<< HEAD
+=======
+  if (sprint4) {
+    await comprobarSprint4({ origin: liveOrigin, setup, login, producto, root });
+  } else if (sprint3) {
+    await comprobarSprint3({ origin: liveOrigin, setup, login, producto, browser, root });
+  } else {
+>>>>>>> b8cc668 (App con 4 sprints + semana 1 y 2)
   await comprobarSprint1(liveOrigin);
   const live = await setup(liveOrigin);
   const { page, state } = live;
@@ -213,6 +271,7 @@ try {
   await page.getByRole("button", { name: "Confirmar compra", exact: true }).click();
   await page.getByText("¡Pedido N.° 901 generado exitosamente!", { exact: true }).waitFor();
   assert.equal(state.compras[0].claveIdempotencia, state.compras[1].claveIdempotencia);
+  await page.locator('#cantidad-input[max="2"]').waitFor();
   assert.equal(await page.locator("#cantidad-input").getAttribute("max"), "2");
   assert.deepEqual(live.errors, []);
   await live.context.close();
@@ -271,6 +330,7 @@ try {
   assert.deepEqual(demo.errors, []);
   await demo.context.close();
   console.log("PASS demostración: datos de ejemplo, escrituras deshabilitadas y ninguna llamada a la API");
+  }
 } finally {
   if (browser) await browser.close();
   for (const server of servers) server.kill();

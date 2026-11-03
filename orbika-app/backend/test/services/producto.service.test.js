@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buscarProductos, editarProducto, publicarProducto } from "../../src/services/producto.service.js";
+import { buscarProductos, obtenerProducto, editarProducto, publicarProducto } from "../../src/services/producto.service.js";
 
 function queryReturning(data = []) {
   const promise = Promise.resolve({ data, error: null });
@@ -13,6 +13,25 @@ function queryReturning(data = []) {
 }
 
 describe("servicio de productos", () => {
+  it("combina nombre, categoría, zona y precio máximo sin perder el orden", async () => {
+    const q = queryReturning([]);
+    await buscarProductos({ busqueda: " pan ", categoriaId: "2", zona: " Tacna ", maxPrecio: "5.25", orden: "mayor_descuento" }, { from: () => q });
+    expect(q.ilike).toHaveBeenCalledWith("nombre", "%pan%");
+    expect(q.ilike).toHaveBeenCalledWith("zona", "Tacna");
+    expect(q.eq).toHaveBeenCalledWith("categoria_id", 2);
+    expect(q.lte).toHaveBeenCalledWith("precio_actual", 5.25);
+    expect(q.order).toHaveBeenCalledWith("descuento_pct", { ascending: false });
+  });
+  it.each([{ busqueda: ["pan"] }, { zona: {} }, { categoriaId: [1] }, { maxPrecio: [] }, { busqueda: "a".repeat(81) }])("rechaza filtros malformados sin error interno: %j", async (filtros) => {
+    await expect(buscarProductos(filtros, { from: () => queryReturning() })).rejects.toMatchObject({ status: 400 });
+  });
+  it("no confunde una caída de datos con un producto inexistente", async () => {
+    const q = queryReturning();
+    q.single = async () => ({ data: null, error: { code: "08006" } });
+    await expect(obtenerProducto(1, { from: () => q })).rejects.toMatchObject({ status: 502 });
+    q.single = async () => ({ data: null, error: { code: "PGRST116" } });
+    await expect(obtenerProducto(1, { from: () => q })).rejects.toMatchObject({ status: 404 });
+  });
   it("el catálogo exige productos comprables y admite búsqueda", async () => {
     const q = queryReturning([]);
     const db = { from: vi.fn(() => q) };

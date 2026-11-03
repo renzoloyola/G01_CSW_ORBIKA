@@ -34,6 +34,24 @@ describe("API HTTP con autenticación y persistencia controladas", () => {
     expect(response.body).toEqual({ error: "Stock insuficiente", code: "DATA_CONFLICT" });
     vi.restoreAllMocks();
   });
+  it("RF-07: responde 201 con el pedido persistido y no acepta precios del cliente", async () => {
+    db.rpc.mockResolvedValue({ data: { id: 9, estado: "creado", monto_total: 8 }, error: null });
+    const response = await request(app).post("/api/pedidos").set("Authorization", "Bearer buyer")
+      .send({ productoId: 1, cantidad: 2, modalidadEntrega: "recojo", claveIdempotencia: clave,
+        precio: 0.01, monto_total: 0.02, comprador_id: "intruso" });
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({ id: 9, estado: "creado", monto_total: 8 });
+    expect(db.rpc).toHaveBeenCalledWith("crear_pedido_transaccion", {
+      p_producto_id: 1, p_comprador_id: "buyer", p_cantidad: 2, p_modalidad_entrega: "recojo",
+      p_referencia_entrega: null, p_clave_idempotencia: clave,
+    });
+  });
+  it.each([true, [1], 2147483648])("RF-07: cantidad inválida %j responde 400 sin escribir", async (cantidad) => {
+    const response = await request(app).post("/api/pedidos").set("Authorization", "Bearer buyer")
+      .send({ productoId: 1, cantidad, modalidadEntrega: "recojo", claveIdempotencia: clave });
+    expect(response.status).toBe(400);
+    expect(db.rpc).not.toHaveBeenCalled();
+  });
   it("el vendedor no puede completar y el comprador sí confirma la recepción", async () => {
     const denied = await request(app).patch("/api/pedidos/1/estado").set("Authorization", "Bearer seller").send({ estado: "completado" });
     expect(denied.status).toBe(403);

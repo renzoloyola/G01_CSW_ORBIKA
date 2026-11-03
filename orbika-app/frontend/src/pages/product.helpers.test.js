@@ -8,9 +8,18 @@ import {
   fechaLocal,
   modalidadesDisponibles,
   serializarFiltros,
+  validarUrlFoto,
 } from "./product.helpers.js";
 
 describe("helpers de productos", () => {
+  it("acepta fotos opcionales o enlaces web y rechaza texto y otros protocolos", () => {
+    for (const value of [undefined, "", "   ", "https://example.com/foto.png", " http://example.com/foto.jpg "]) {
+      expect(validarUrlFoto(value)).toBe(true);
+    }
+    for (const value of ["ss", "/foto.png", "javascript:alert(1)", "data:image/png;base64,AAAA", "ftp://example.com/foto.jpg"]) {
+      expect(validarUrlFoto(value)).toBe("La foto debe ser una URL http o https válida.");
+    }
+  });
   it("elimina filtros vacíos y convierte números", () => {
     expect(serializarFiltros({ busqueda: " tomate ", categoriaId: "2", zona: "", maxPrecio: "15.5", orden: "precio_asc" }))
       .toEqual({ busqueda: "tomate", categoriaId: 2, maxPrecio: 15.5, orden: "precio_asc" });

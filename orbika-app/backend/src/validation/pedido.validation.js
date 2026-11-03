@@ -10,6 +10,13 @@ export const TRANSICIONES_PEDIDO = Object.freeze({
 });
 
 export function validarCompra(input) {
+  for (const campo of ["productoId", "cantidad"]) {
+    const valor = input?.[campo];
+    if (!["number", "string"].includes(typeof valor) || !Number.isSafeInteger(Number(valor))
+      || Number(valor) <= 0 || (campo === "cantidad" && Number(valor) > 2147483647)) {
+      throw datoInvalido(`El campo ${campo === "productoId" ? "producto" : campo} debe ser un entero positivo válido.`);
+    }
+  }
   const modalidadEntrega = input?.modalidadEntrega;
   if (!["recojo", "coordinada"].includes(modalidadEntrega)) {
     throw datoInvalido("La modalidad de entrega no es válida.");

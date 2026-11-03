@@ -13,6 +13,19 @@ function queryReturning(data, error = null) {
 const pedido = (estado) => ({ id: 1, comprador_id: "buyer", estado, detalle_pedidos: [{ productos: { vendedor_id: "seller" } }] });
 
 describe("servicio de pedidos", () => {
+  it.each(["PGRST200", "PGRST201", "42703", "42P01"])("distingue un esquema incompatible (%s) de un historial vacío", async (code) => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(listarPedidosDeUsuario("seller", "vendedor", { from: () => queryReturning(null, { code }) }))
+        .rejects.toMatchObject({ status: 503, code: "ORDER_SCHEMA_NOT_READY" });
+    } finally { log.mockRestore(); }
+  });
+  it("restringe las compras y admite el detalle uno a uno", async () => {
+    const q = queryReturning([{ id: 1, detalle_pedidos: { nombre_producto_compra: "Pan comprado", productos: { vendedor_id: "seller" } } }]);
+    const rows = await listarPedidosDeUsuario("buyer", "comprador", { from: () => q });
+    expect(q.eq).toHaveBeenCalledWith("comprador_id", "buyer");
+    expect(rows[0].productos.nombre).toBe("Pan comprado");
+  });
   it.each([{ id: "seller", rol: "vendedor" }, { id: "buyer", rol: "comprador", activo: false }])("impide nuevas compras a cuentas no habilitadas", async (actor) => {
     const db = { rpc: vi.fn() };
     await expect(crearPedido(actor, compra, db)).rejects.toMatchObject({ status: 403 });

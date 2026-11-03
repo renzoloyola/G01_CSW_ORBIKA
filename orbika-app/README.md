@@ -171,10 +171,65 @@ Si Playwright se proporciona mediante un runtime externo, establecer
 `ORBIKA_PLAYWRIGHT_ENTRYPOINT` con la ruta absoluta a su `index.mjs`.
 `ORBIKA_BROWSER_CHANNEL` permite elegir el canal (predeterminado: `msedge`).
 
+<<<<<<< HEAD
 Antes del piloto se requiere aplicar las migraciones pendientes hasta 004 en Supabase de pruebas y validar allí
 PostgREST, autenticación real, Storage, recuperación por correo y compras
 simultáneas. Los resultados locales no acreditan rendimiento, disponibilidad
 mensual, aceptación de usuarios ni cumplimiento de los 21 casos de uso.
+=======
+El proyecto Supabase configurado se actualizó hasta 004 el 24/10/2026;
+el 25/10 se verificaron lecturas reales de ventas, catálogo y detalle. No repetir
+las migraciones ya aplicadas. En otro proyecto, comprobar primero su estado.
+Antes del piloto siguen pendientes autenticación y recuperación completas,
+Storage y compras simultáneas con cuentas reales. Las comprobaciones actuales
+no acreditan disponibilidad mensual ni cumplimiento de los 21 casos de uso.
+
+La trazabilidad y la aceptación pendiente de los primeros sprints están en
+[sprints-01-02.md](docs/sprints-01-02.md), organizadas en análisis, diseño,
+implementación y pruebas.
+
+## Sprint 3: catálogo y detalle
+
+El [informe del sprint 3](docs/sprint-03.md) registra RF-05, RF-06 y RNF-02,
+las correcciones de lectura de «Mis ventas», capturas y tiempos medidos.
+
+```powershell
+# Desde backend: solo lectura de la base configurada, sin imprimir datos personales.
+npm run check:data
+
+# Desde frontend: navegador con datos ficticios y compilación de producción aislada.
+npm run test:sprint3
+
+# Desde frontend: medición con Express local y Supabase real; solo lecturas públicas.
+npm run test:performance:live
+```
+
+Los reportes nuevos se guardan por defecto en `frontend/test-results/sprint-03`.
+Para conservarlos en otro directorio, establecer `ORBIKA_QA_OUTPUT`.
+Las evidencias de esta entrega están en `docs/evidencias/sprint-03`.
+El ensayo remoto se hizo con catálogo vacío y un detalle no disponible;
+se debe repetir con ofertas vigentes y la carga esperada antes del piloto.
+
+## Sprint 4: compra y stock
+
+El [informe del sprint 4](docs/sprint-04.md) documenta RF-07: confirmación con
+oferta vigente, datos de compra bloqueados durante el envío, reintentos y
+consulta del stock persistido después de comprar. Incluye pruebas con dos
+conexiones PostgreSQL reales y evidencias HTTP de compra y conflicto de stock.
+
+```powershell
+# Desde backend, con herramientas PostgreSQL nativas instaladas.
+$env:ORBIKA_PG_BIN = 'C:\Program Files\PostgreSQL\18\bin'
+npm run test:sprint4
+
+# Desde frontend: interfaz compilada con datos ficticios.
+npm run test:sprint4
+```
+
+La prueba nativa usa una base temporal local en `127.0.0.1:65439` y la apaga al
+terminar. No modifica Supabase remoto. Los informes y capturas de esta entrega
+están en `docs/evidencias/sprint-04`; la aceptación con cuentas reales sigue pendiente.
+>>>>>>> b8cc668 (App con 4 sprints + semana 1 y 2)
 
 La trazabilidad y la aceptación pendiente de los primeros sprints están en
 [sprints-01-02.md](docs/sprints-01-02.md), organizadas en análisis, diseño,

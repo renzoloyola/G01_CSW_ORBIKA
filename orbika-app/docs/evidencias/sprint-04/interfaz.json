@@ -1,0 +1,38 @@
+{
+  "fecha": "2026-10-30T22:26:09.485Z",
+  "entorno": "Edge headless, compilación de producción, API/Auth simuladas",
+  "cases": [
+    {
+      "caso": "Precio vigente antes de confirmar y stock consultado después de comprar",
+      "resultado": "PASS"
+    },
+    {
+      "caso": "Oferta con menos stock detectada antes de enviar el pedido",
+      "resultado": "PASS"
+    },
+    {
+      "caso": "Revisar una confirmación sin enviarla vuelve a consultar el precio",
+      "resultado": "PASS"
+    },
+    {
+      "caso": "Conflicto de stock entre consulta y confirmación sin éxito falso",
+      "resultado": "PASS"
+    },
+    {
+      "caso": "Doble clic, cantidad y referencia bloqueadas mientras se confirma",
+      "resultado": "PASS"
+    },
+    {
+      "caso": "Respuesta perdida: reintento con la misma clave sin duplicar pedido ni stock",
+      "resultado": "PASS"
+    },
+    {
+      "caso": "Pedido confirmado aunque falle la recarga; exige actualizar antes de otra compra",
+      "resultado": "PASS"
+    },
+    {
+      "caso": "Compra en pantalla de 320 px con cantidad inválida y confirmación legible",
+      "resultado": "PASS"
+    }
+  ]
+}

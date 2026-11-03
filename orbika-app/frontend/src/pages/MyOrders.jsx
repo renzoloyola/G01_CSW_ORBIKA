@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { marketplace, mensajeError } from "../services/marketplace";
 import { useAuth } from "../context/AuthContext";
@@ -17,22 +17,27 @@ export default function MyOrders() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [pestanaActiva, setPestanaActiva] = useState("todos");
+  const solicitud = useRef(0);
 
   const cargar = useCallback(async () => {
+    const actual = ++solicitud.current;
     setCargando(true);
+    setPedidos([]);
     setError("");
     try {
-      setPedidos(await marketplace.listarPedidos());
+      const datos = await marketplace.listarPedidos();
+      if (actual === solicitud.current) setPedidos(datos);
     } catch (err) {
-      setPedidos([]);
-      setError(mensajeError(err, "No se pudieron cargar los pedidos."));
+      if (actual === solicitud.current) setError(mensajeError(err, "No se pudieron cargar los pedidos."));
     } finally {
-      setCargando(false);
+      if (actual === solicitud.current) setCargando(false);
     }
-  }, []);
+  }, [perfil?.id, perfil?.rol]);
 
   useEffect(() => {
+    setPestanaActiva("todos");
     cargar();
+    return () => { solicitud.current++; };
   }, [cargar]);
 
   // Recuentos por estado

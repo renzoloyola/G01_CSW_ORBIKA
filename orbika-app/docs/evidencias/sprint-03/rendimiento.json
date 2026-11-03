@@ -1,0 +1,232 @@
+{
+  "fecha": "2026-10-25T22:35:51.707Z",
+  "entorno": {
+    "sistema": "win32 10.0.19045",
+    "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+    "ramGiB": 16,
+    "node": "v24.22.1",
+    "navegador": "156.0.4314.42",
+    "build": "Vite producción, preview local",
+    "viewport": "1440x1000",
+    "concurrencia": 1,
+    "productos": 5,
+    "api": "Simulada; 80 ms añadidos por lectura de catálogo/detalle",
+    "cache": "Contexto nuevo por navegación; proceso servidor caliente",
+    "medicion": "Navegación hasta datos, imágenes visibles decodificadas y dos cuadros de pintura",
+    "limite": "No mide Express, Supabase, correo, red de producción ni carga concurrente. No acredita RNF-02 en despliegue real."
+  },
+  "resumen": {
+    "catalogo": {
+      "n": 20,
+      "p95_ms": 586,
+      "max_ms": 607
+    },
+    "detalle": {
+      "n": 20,
+      "p95_ms": 537,
+      "max_ms": 588
+    }
+  },
+  "muestras": [
+    {
+      "pagina": "catalogo",
+      "muestra": 1,
+      "ms": 585
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 1,
+      "ms": 493
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 2,
+      "ms": 525
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 2,
+      "ms": 523
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 3,
+      "ms": 479
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 3,
+      "ms": 456
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 4,
+      "ms": 436
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 4,
+      "ms": 479
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 5,
+      "ms": 472
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 5,
+      "ms": 468
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 6,
+      "ms": 481
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 6,
+      "ms": 441
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 7,
+      "ms": 461
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 7,
+      "ms": 460
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 8,
+      "ms": 484
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 8,
+      "ms": 477
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 9,
+      "ms": 607
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 9,
+      "ms": 513
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 10,
+      "ms": 464
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 10,
+      "ms": 507
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 11,
+      "ms": 517
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 11,
+      "ms": 588
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 12,
+      "ms": 586
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 12,
+      "ms": 537
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 13,
+      "ms": 579
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 13,
+      "ms": 526
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 14,
+      "ms": 488
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 14,
+      "ms": 474
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 15,
+      "ms": 427
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 15,
+      "ms": 460
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 16,
+      "ms": 435
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 16,
+      "ms": 460
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 17,
+      "ms": 468
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 17,
+      "ms": 481
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 18,
+      "ms": 475
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 18,
+      "ms": 435
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 19,
+      "ms": 423
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 19,
+      "ms": 464
+    },
+    {
+      "pagina": "catalogo",
+      "muestra": 20,
+      "ms": 501
+    },
+    {
+      "pagina": "detalle",
+      "muestra": 20,
+      "ms": 453
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { DEMO_MODE, marketplace, mensajeError } from "../services/marketplace";
 import { useAuth } from "../context/AuthContext";
@@ -34,6 +34,10 @@ export default function ProductDetail() {
   const navigate = useNavigate();
 
   const [producto, setProducto] = useState(null);
+  const solicitud = useRef(0);
+  const operacion = useRef(false);
+  const [verificando, setVerificando] = useState(false);
+  const [requiereActualizar, setRequiereActualizar] = useState(false);
   usePageTitle(producto ? producto.nombre : "Detalle de producto");
   const [cantidad, setCantidad] = useState(1);
   const [modalidad, setModalidad] = useState("recojo");
@@ -47,23 +51,34 @@ export default function ProductDetail() {
   const [compraIntento, setCompraIntento] = useState(null);
 
   function cargarDetalle() {
+    const actual = ++solicitud.current;
     setCargando(true);
     setErrorCarga("");
     setProducto(null);
+    setRequiereActualizar(false);
     setMensajeExito(null);
     setCompraIntento(null);
+    setModalConfirmarAbierto(false);
     marketplace.obtenerProducto(id)
       .then((data) => {
+        if (actual !== solicitud.current) return;
         setProducto(data);
+        setCantidad(1);
+        setReferencia("");
+        setErrorCompra("");
         setModalidad(modalidadesDisponibles(data)[0] || "recojo");
       })
-      .catch((err) => setErrorCarga(mensajeError(err, "No se pudo cargar el producto.")))
-      .finally(() => setCargando(false));
+      .catch((err) => { if (actual === solicitud.current) setErrorCarga(mensajeError(err, "No se pudo cargar el producto.")); })
+      .finally(() => { if (actual === solicitud.current) setCargando(false); });
   }
 
-  useEffect(() => { cargarDetalle(); }, [id]);
+  useEffect(() => {
+    cargarDetalle();
+    return () => { solicitud.current++; };
+  }, [id]);
 
-  function abrirModalCompra() {
+  async function abrirModalCompra() {
+    if (operacion.current) return;
     if (!cantidadValida(cantidad, producto?.stock || 0)) {
       setErrorCompra("Por favor selecciona una cantidad válida dentro del stock.");
       return;
@@ -75,21 +90,58 @@ export default function ProductDetail() {
     };
     const firma = JSON.stringify(datos);
     if (compraIntento?.firma !== firma) {
-      setCompraIntento({ firma, datos, claveIdempotencia: crypto.randomUUID() });
+      setCompraIntento({ firma, datos, claveIdempotencia: crypto.randomUUID(), enviada: false });
     }
-    setModalConfirmarAbierto(true);
+    // Un reintento conserva su clave y sus datos ante una respuesta perdida.
+    if (compraIntento?.firma === firma && compraIntento.enviada) {
+      setModalConfirmarAbierto(true);
+      return;
+    }
+    operacion.current = true;
+    setVerificando(true);
+    const vigente = solicitud.current;
+    try {
+      const actual = await marketplace.obtenerProducto(id);
+      if (vigente !== solicitud.current) return;
+      setProducto(actual);
+      if (!["disponible", "proximo_a_vencer"].includes(actual.estado)
+        || calcularEstadoVencimiento(actual.fecha_vencimiento).dias <= 0
+        || !cantidadValida(datos.cantidad, actual.stock)) {
+        setCompraIntento(null);
+        setErrorCompra("La oferta cambió o no tiene stock suficiente. Revisa la cantidad disponible.");
+        return;
+      }
+      if (!modalidadesDisponibles(actual).includes(datos.modalidadEntrega)
+        || (datos.modalidadEntrega === "coordinada" && !datos.referenciaEntrega.trim())) {
+        setCompraIntento(null);
+        setErrorCompra("Revisa la modalidad y completa la referencia de entrega.");
+        return;
+      }
+      setModalConfirmarAbierto(true);
+    } catch (err) {
+      if (vigente === solicitud.current) {
+        setCompraIntento(null);
+        setErrorCompra(mensajeError(err, "No se pudo verificar la oferta. Reintenta."));
+      }
+    } finally { operacion.current = false; setVerificando(false); }
   }
 
   async function ejecutarCompra() {
+    if (operacion.current || !compraIntento) return;
+    operacion.current = true;
+    const intento = compraIntento;
+    setCompraIntento({ ...intento, enviada: true });
+    const vigente = solicitud.current;
     setEnviando(true);
     setErrorCompra("");
     setMensajeExito(null);
 
     try {
       const pedido = await marketplace.comprarProducto({
-        ...compraIntento.datos, claveIdempotencia: compraIntento.claveIdempotencia,
+        ...intento.datos, claveIdempotencia: intento.claveIdempotencia,
       });
 
+      if (vigente !== solicitud.current) return;
       setModalConfirmarAbierto(false);
       toast.success(`¡Pedido N.° ${pedido.id} registrado con éxito!`);
       setMensajeExito({
@@ -98,24 +150,26 @@ export default function ProductDetail() {
         montoTotal: pedido.monto_total,
       });
 
-      // Actualizar el stock local restante del producto
-      setProducto((prev) => {
-        if (!prev) return prev;
-        const nuevoStock = Math.max(0, prev.stock - cantidad);
-        return {
-          ...prev,
-          stock: nuevoStock,
-          estado: nuevoStock === 0 ? "vendido" : prev.estado,
-        };
-      });
+      // El stock lo decide PostgreSQL; puede haber otras compras concurrentes.
+      setRequiereActualizar(true);
+      try {
+        const actual = await marketplace.obtenerProducto(id);
+        if (vigente === solicitud.current) {
+          setProducto(actual);
+          setRequiereActualizar(false);
+        }
+      } catch { /* Pedido confirmado; exigir recarga antes de comprar otra vez. */ }
+      if (vigente !== solicitud.current) return;
       setCantidad(1);
       setCompraIntento(null);
     } catch (err) {
+      if (vigente !== solicitud.current) return;
       const msg = mensajeError(err, "No se pudo completar la compra. Intenta nuevamente.");
       setErrorCompra(msg);
       toast.error(msg);
       setModalConfirmarAbierto(false);
     } finally {
+      operacion.current = false;
       setEnviando(false);
     }
   }
@@ -132,7 +186,7 @@ export default function ProductDetail() {
           title="Producto no disponible"
           description={errorCarga || "No encontramos el producto que buscas."}
           actionLabel="Volver al catálogo"
-          onAction={() => navigate("/")}
+          onAction={() => navigate("/catalogo")}
         />
       </div>
     );
@@ -144,7 +198,7 @@ export default function ProductDetail() {
   const estadoInfo = ETIQUETAS_ESTADO[producto.estado] ?? ETIQUETAS_ESTADO.disponible;
   const esVendedorDuenio = perfil?.id === producto.vendedor_id;
   const esRolVendedor = perfil?.rol === "vendedor";
-  const puedeComprar = !DEMO_MODE && perfil?.rol === "comprador" && perfil.activo !== false && ["disponible", "proximo_a_vencer"].includes(producto.estado) && producto.stock > 0 && vencimiento.dias > 0 && !esVendedorDuenio;
+  const puedeComprar = !enviando && !verificando && !requiereActualizar && !DEMO_MODE && perfil?.rol === "comprador" && perfil.activo !== false && ["disponible", "proximo_a_vencer"].includes(producto.estado) && producto.stock > 0 && vencimiento.dias > 0 && !esVendedorDuenio;
 
   const totalPagar = (Number(producto.precio_actual) * Number(cantidad || 1)).toFixed(2);
   const totalAhorrado = (ahorro.montoAhorro * Number(cantidad || 1)).toFixed(2);
@@ -338,6 +392,11 @@ export default function ProductDetail() {
             </div>
           </div>
 
+          {requiereActualizar && <div role="status" className="bg-amber/15 rounded-xl p-4 text-sm">
+            El pedido está confirmado. Actualiza la disponibilidad antes de otra compra.
+            <Button variant="secondary" onClick={cargarDetalle}>Actualizar disponibilidad</Button>
+          </div>}
+
           {/* Descripción del producto */}
           {producto.descripcion && (
             <div className="bg-card border border-sage/40 rounded-2xl p-5 shadow-xs">
@@ -426,6 +485,7 @@ export default function ProductDetail() {
                   type="text"
                   placeholder="Ej. Calle San Martín 450, cerca al mercado central"
                   value={referencia}
+                  disabled={enviando || verificando}
                   onChange={(e) => setReferencia(e.target.value)}
                   className="w-full border border-gray-300 bg-white rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss/40"
                 />
@@ -465,6 +525,7 @@ export default function ProductDetail() {
                 size="lg"
                 fullWidth
                 disabled={!puedeComprar}
+                loading={verificando}
                 onClick={abrirModalCompra}
               >
                 {producto.stock <= 0
@@ -524,7 +585,7 @@ export default function ProductDetail() {
       {/* Modal Accesible de Confirmación de Pedido */}
       <ConfirmModal
         isOpen={modalConfirmarAbierto}
-        onClose={() => setModalConfirmarAbierto(false)}
+        onClose={() => { if (!operacion.current) setModalConfirmarAbierto(false); }}
         onConfirm={ejecutarCompra}
         title="Confirmar tu pedido"
         confirmLabel="Confirmar compra"

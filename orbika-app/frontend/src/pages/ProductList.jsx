@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { marketplace, mensajeError } from "../services/marketplace";
 import ProductCard from "../components/ProductCard";
 import { serializarFiltros } from "./product.helpers";
@@ -20,28 +20,37 @@ export default function ProductList() {
   const [aplicados, setAplicados] = useState(filtrosIniciales);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [errorCategorias, setErrorCategorias] = useState("");
+  const [reintento, setReintento] = useState(0);
+  const solicitud = useRef(0);
   const [modalFiltrosAbierto, setModalFiltrosAbierto] = useState(false);
 
   useEffect(() => {
-    marketplace.listarCategorias().then(setCategorias)
-      .catch((err) => setError(mensajeError(err, "No se pudieron cargar las categorías.")));
-  }, []);
+    let vigente = true;
+    setErrorCategorias("");
+    marketplace.listarCategorias().then((datos) => { if (vigente) setCategorias(datos); })
+      .catch((err) => { if (vigente) setErrorCategorias(mensajeError(err, "No se pudieron cargar las categorías.")); });
+    return () => { vigente = false; };
+  }, [reintento]);
 
   function cargarCatalogo() {
+    const actual = ++solicitud.current;
     setCargando(true);
     setError("");
     marketplace.listarProductos(serializarFiltros(aplicados))
-      .then(setProductos)
+      .then((datos) => { if (actual === solicitud.current) setProductos(datos); })
       .catch((err) => {
+        if (actual !== solicitud.current) return;
         setProductos([]);
         setError(mensajeError(err, "No se pudo cargar el catálogo."));
       })
-      .finally(() => setCargando(false));
+      .finally(() => { if (actual === solicitud.current) setCargando(false); });
   }
 
   useEffect(() => {
     cargarCatalogo();
-  }, [aplicados]);
+    return () => { solicitud.current++; };
+  }, [aplicados, reintento]);
 
   function cambiar(event) {
     const { name, value } = event.target;
@@ -60,11 +69,10 @@ export default function ProductList() {
     setModalFiltrosAbierto(false);
   }
 
-  function seleccionarCategoriaRapida(catId) {
-    const nuevoId = filtros.categoriaId === String(catId) ? "" : String(catId);
-    const nuevos = { ...filtros, categoriaId: nuevoId };
-    setFiltros(nuevos);
-    setAplicados(nuevos);
+  function seleccionarCategoria(catId) {
+    const categoriaId = String(catId);
+    setFiltros((actual) => ({ ...actual, categoriaId }));
+    setAplicados((actual) => ({ ...actual, categoriaId }));
   }
 
   const cantidadFiltrosActivos = useMemo(() => {
@@ -153,7 +161,7 @@ export default function ProductList() {
                 <select
                   name="categoriaId"
                   value={filtros.categoriaId}
-                  onChange={cambiar}
+                  onChange={(event) => seleccionarCategoria(event.target.value)}
                   className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-moss/40"
                 >
                   <option value="">Todas las categorías</option>
@@ -185,8 +193,8 @@ export default function ProductList() {
                 </label>
                 <input
                   type="number"
-                  min="0.10"
-                  step="0.50"
+                  min="0.01"
+                  step="0.01"
                   name="maxPrecio"
                   value={filtros.maxPrecio}
                   onChange={cambiar}
@@ -226,9 +234,10 @@ export default function ProductList() {
                 </span>
                 <button
                   type="button"
-                  onClick={() => seleccionarCategoriaRapida("")}
+                  onClick={() => seleccionarCategoria("")}
+                  aria-pressed={!aplicados.categoriaId}
                   className={`px-3 py-1 rounded-full border transition-all shrink-0 font-medium ${
-                    !filtros.categoriaId
+                    !aplicados.categoriaId
                       ? "bg-forest text-white border-forest shadow-xs"
                       : "bg-paper-warm border-sage/40 text-forest-deep hover:bg-sage/30"
                   }`}
@@ -236,12 +245,13 @@ export default function ProductList() {
                   Todas
                 </button>
                 {categorias.map((c) => {
-                  const activa = filtros.categoriaId === String(c.id);
+                  const activa = aplicados.categoriaId === String(c.id);
                   return (
                     <button
                       key={c.id}
                       type="button"
-                      onClick={() => seleccionarCategoriaRapida(c.id)}
+                      onClick={() => seleccionarCategoria(c.id)}
+                      aria-pressed={activa}
                       className={`px-3 py-1 rounded-full border transition-all shrink-0 font-medium ${
                         activa
                           ? "bg-forest text-white border-forest shadow-xs"
@@ -318,8 +328,8 @@ export default function ProductList() {
               </label>
               <input
                 type="number"
-                min="0.10"
-                step="0.50"
+                min="0.01"
+                step="0.01"
                 name="maxPrecio"
                 value={filtros.maxPrecio}
                 onChange={cambiar}
@@ -354,7 +364,7 @@ export default function ProductList() {
             <h2 className="font-serif text-2xl font-semibold text-forest-deep">
               Catálogo disponible
             </h2>
-            {!cargando && !error && (
+            {!cargando && !error && !errorCategorias && (
               <Badge variant="neutral" size="sm">
                 {productos.length} {productos.length === 1 ? "producto" : "productos"}
               </Badge>
@@ -385,17 +395,17 @@ export default function ProductList() {
         {/* Estados de Carga, Error, Vacío y Lista */}
         {cargando && <SkeletonGrid count={8} />}
 
-        {error && (
+        {(error || errorCategorias) && (
           <StatePanel
             type="error"
             title="Ocurrió un inconveniente"
-            description={error}
+            description={error || errorCategorias}
             actionLabel="Reintentar carga"
-            onAction={cargarCatalogo}
+            onAction={() => setReintento((n) => n + 1)}
           />
         )}
 
-        {!cargando && !error && productos.length === 0 && (
+        {!cargando && !error && !errorCategorias && productos.length === 0 && (
           <StatePanel
             type="empty"
             title="No se encontraron productos"
@@ -409,7 +419,7 @@ export default function ProductList() {
           />
         )}
 
-        {!cargando && !error && productos.length > 0 && (
+        {!cargando && !error && !errorCategorias && productos.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {productos.map((producto) => (
               <ProductCard key={producto.id} producto={producto} />

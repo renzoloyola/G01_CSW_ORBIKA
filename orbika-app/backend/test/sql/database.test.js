@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { beforeAll, beforeEach, afterEach, afterAll, describe, expect, it } from "vitest";
+import { buscarProductos } from "../../src/services/producto.service.js";
 
 // PostgreSQL real en memoria; auth y storage se reducen a las tablas/funciones
 // externas que necesita el esquema. No sustituye las pruebas de PostgREST o Auth remoto.
@@ -51,6 +52,32 @@ afterEach(async () => { await db.exec("rollback;"); });
 afterAll(async () => { if (db) await db.close(); });
 
 describe("migraciones ejecutadas en PostgreSQL", () => {
+<<<<<<< HEAD
+=======
+  it("RF-05: ejecuta los filtros combinados del servicio sobre ofertas persistidas", async () => {
+    await db.query("update productos set zona='Tacna' where id=$1", [productoId]);
+    await db.query(`insert into productos(vendedor_id,categoria_id,nombre,precio_original,precio_actual,fecha_vencimiento,stock,zona)
+      values($1,1,'Pan caro',10,7,'2099-01-01',3,'Tacna'),($1,1,'Pan vecino',10,4,'2099-01-01',3,'Pocollay'),
+        ($1,1,'Galletas',10,4,'2099-01-01',3,'Tacna')`, [seller]);
+    // Adaptador de lectura: traduce los operadores emitidos por el servicio a SQL.
+    // PostgreSQL aplica los filtros a filas reales; no se preselecciona la respuesta.
+    const adapter = { from(table) {
+      const where = [], values = [];
+      const condition = (column, op, value) => { values.push(value); where.push(`${column} ${op} $${values.length}`); return q; };
+      const q = { select: () => q, eq: (c,v) => condition(c,"=",v), gt: (c,v) => condition(c,">",v),
+        lte: (c,v) => condition(c,"<=",v), ilike: (c,v) => condition(c,"ilike",v),
+        in(c,v) { values.push(v); where.push(`${c} = any($${values.length}::text[])`); return q; },
+        async order(c, { ascending }) { const r = await db.query(`select * from ${table} where ${where.join(" and ")} order by ${c} ${ascending ? "asc" : "desc"}`, values); return { data: r.rows, error: null }; },
+      }; return q;
+    } };
+    const filtros = { busqueda: "pAn", categoriaId: 1, zona: "tacna", maxPrecio: 5.25, orden: "precio_asc" };
+    const result = await buscarProductos(filtros, adapter);
+    expect(result.map((p) => p.id)).toEqual([productoId]);
+    expect(await buscarProductos({ ...filtros, maxPrecio: 1 }, adapter)).toEqual([]);
+    const ordered = await buscarProductos({ ...filtros, maxPrecio: 10 }, adapter);
+    expect(ordered.map((p) => Number(p.precio_actual))).toEqual([5, 7]);
+  });
+>>>>>>> b8cc668 (App con 4 sprints + semana 1 y 2)
   it("calcula el descuento con un decimal sin eliminar la vista ni sus dependencias", async () => {
     await db.query("update productos set precio_original=7,precio_actual=4 where id=$1", [productoId]);
     const row = (await db.query("select descuento_pct,descuento_pct_entero,estado from productos_con_descuento where id=$1", [productoId])).rows[0];
@@ -72,6 +99,9 @@ describe("migraciones ejecutadas en PostgreSQL", () => {
     expect(result.rows[0].peso_unidad_kg_compra).toBeNull();
     const columns = await db.query("select column_name from information_schema.columns where table_schema='public' and table_name='pedidos'");
     expect(columns.rows.map((r) => r.column_name)).not.toContain("producto_id");
+    expect(columns.rows.map((r) => r.column_name)).toContain("producto_id_legacy");
+    const original = (await db.query("select producto_id_legacy from pedidos where id=$1", [legacyPedido])).rows[0];
+    expect(original.producto_id_legacy).toBe(result.rows[0].producto_id);
   });
   it("una confirmación repetida crea un pedido, descuenta una vez y notifica una vez", async () => {
     const first = await buy(); const retry = await buy();
@@ -79,6 +109,36 @@ describe("migraciones ejecutadas en PostgreSQL", () => {
     expect(await stock()).toBe(2);
     expect(Number((await db.query("select count(*) as n from pedidos where clave_idempotencia=$1", [key])).rows[0].n)).toBe(1);
     expect(Number((await db.query("select count(*) as n from notificaciones")).rows[0].n)).toBe(1);
+  });
+  it("RF-07: usa el precio vigente y persiste el pedido con estado creado", async () => {
+    await db.query("update productos set precio_actual=4 where id=$1", [productoId]);
+    const pedido = await buy(productoId, 2);
+    expect(pedido.estado).toBe("creado");
+    expect(Number(pedido.monto_total)).toBe(8);
+    expect(await stock()).toBe(1);
+    const detalle = (await db.query("select precio_unitario,subtotal from detalle_pedidos where pedido_id=$1", [pedido.id])).rows[0];
+    expect(Number(detalle.precio_unitario)).toBe(4);
+    expect(Number(detalle.subtotal)).toBe(8);
+  });
+  it("RF-07: pedir más unidades que el stock no deja escrituras parciales", async () => {
+    await db.exec("savepoint compra;");
+    await expect(buy(productoId, 4)).rejects.toThrow("stock suficiente");
+    await db.exec("rollback to savepoint compra;");
+    expect(await stock()).toBe(3);
+    expect(Number((await db.query("select count(*) as n from pedidos where clave_idempotencia=$1", [key])).rows[0].n)).toBe(0);
+    expect(Number((await db.query("select count(*) as n from detalle_pedidos where producto_id=$1", [productoId])).rows[0].n)).toBe(0);
+  });
+  it("RF-07: un fallo al final revierte pedido, detalle, stock y notificación", async () => {
+    await db.exec(`create function public.fallar_aviso_prueba() returns trigger language plpgsql as $$
+      begin raise exception 'Fallo inducido de notificación'; end; $$;
+      create trigger fallo_aviso before insert on notificaciones for each row execute function fallar_aviso_prueba();
+      savepoint compra;`);
+    await expect(buy(productoId, 2)).rejects.toThrow("Fallo inducido");
+    await db.exec("rollback to savepoint compra;");
+    expect(await stock()).toBe(3);
+    expect(Number((await db.query("select count(*) as n from pedidos where clave_idempotencia=$1", [key])).rows[0].n)).toBe(0);
+    expect(Number((await db.query("select count(*) as n from detalle_pedidos where producto_id=$1", [productoId])).rows[0].n)).toBe(0);
+    expect(Number((await db.query("select count(*) as n from notificaciones")).rows[0].n)).toBe(0);
   });
   it("conserva los valores históricos después de editar los precios", async () => {
     const pedido = await buy();
