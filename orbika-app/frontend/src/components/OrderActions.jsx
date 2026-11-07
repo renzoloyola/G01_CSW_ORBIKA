@@ -1,5 +1,5 @@
 import { DEMO_MODE } from "../services/marketplace";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { api } from "../services/api";
 import { accionesPermitidas } from "../pages/order.helpers";
 import { useToast } from "../context/ToastContext";
@@ -13,7 +13,9 @@ const ETIQUETAS = {
 };
 
 export default function OrderActions({ pedido, rol, onDone }) {
-  const acciones = accionesPermitidas(rol, pedido.estado);
+  // Las acciones visibles dependen del rol, estado y calificación que ya existe.
+  const calificacion = Array.isArray(pedido.calificaciones) ? pedido.calificaciones[0] : pedido.calificaciones;
+  const acciones = accionesPermitidas(rol, pedido.estado).filter(a => a !== "calificar" || !calificacion);
   const { toast } = useToast();
 
   const [modalCancelarAbierto, setModalCancelarAbierto] = useState(false);
@@ -22,8 +24,12 @@ export default function OrderActions({ pedido, rol, onDone }) {
   const [comentario, setComentario] = useState("");
   const [error, setError] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const bloqueo = useRef(false);
 
   async function ejecutarAccionEstado(nuevoEstado) {
+    // El candado evita enviar dos cambios antes de que termine la primera solicitud.
+    if (bloqueo.current) return;
+    bloqueo.current = true;
     setError("");
     setOcupado(true);
     try {
@@ -35,11 +41,15 @@ export default function OrderActions({ pedido, rol, onDone }) {
       setError(msg);
       toast.error(msg);
     } finally {
+      bloqueo.current = false;
       setOcupado(false);
     }
   }
 
   async function confirmarCancelacion(motivo) {
+    // La API valida el estado y devuelve el stock en una sola operación.
+    if (bloqueo.current) return;
+    bloqueo.current = true;
     setError("");
     setOcupado(true);
     try {
@@ -52,12 +62,16 @@ export default function OrderActions({ pedido, rol, onDone }) {
       setError(msg);
       toast.error(msg);
     } finally {
+      bloqueo.current = false;
       setOcupado(false);
     }
   }
 
   async function enviarCalificacion(event) {
+    // El servidor valida que califique el comprador de un pedido completado.
     if (event) event.preventDefault();
+    if (bloqueo.current) return;
+    bloqueo.current = true;
     setOcupado(true);
     setError("");
     try {
@@ -73,14 +87,16 @@ export default function OrderActions({ pedido, rol, onDone }) {
       setError(msg);
       toast.error(msg);
     } finally {
+      bloqueo.current = false;
       setOcupado(false);
     }
   }
 
-  if (DEMO_MODE || acciones.length === 0) return null;
+  if (DEMO_MODE || (acciones.length === 0 && !calificacion)) return null;
 
   return (
     <div className="mt-4 pt-3 border-t border-sage/20">
+      {calificacion && <p className="text-sm text-forest mb-3">Calificación registrada: {calificacion.puntaje} de 5{calificacion.comentario ? ` · ${calificacion.comentario}` : ""}</p>}
       <div className="flex flex-wrap items-center gap-2">
         {/* Acciones de cambio de estado para el vendedor */}
         {acciones
@@ -99,6 +115,7 @@ export default function OrderActions({ pedido, rol, onDone }) {
           ))}
 
         {/* Acción de cancelar para el comprador */}
+        {/* Solo aparece cuando el comprador todavía puede cancelar el pedido. */}
         {acciones.includes("cancelar") && (
           <Button
             size="sm"
@@ -111,6 +128,7 @@ export default function OrderActions({ pedido, rol, onDone }) {
         )}
 
         {/* Acción de calificar para el comprador */}
+        {/* Permite elegir de una a cinco estrellas después de completar la compra. */}
         {acciones.includes("calificar") && (
           <Button
             size="sm"
@@ -137,7 +155,7 @@ export default function OrderActions({ pedido, rol, onDone }) {
       {/* Modal Accesible de Cancelación (Reemplaza window.prompt) */}
       <PromptModal
         isOpen={modalCancelarAbierto}
-        onClose={() => setModalCancelarAbierto(false)}
+        onClose={() => { if (!bloqueo.current) setModalCancelarAbierto(false); }}
         onSubmit={confirmarCancelacion}
         title="Cancelar pedido"
         description="Por favor indícanos el motivo de la cancelación para informar al comercio."
@@ -152,7 +170,7 @@ export default function OrderActions({ pedido, rol, onDone }) {
       {/* Modal Accesible de Calificación */}
       <Modal
         isOpen={modalCalificarAbierto}
-        onClose={() => setModalCalificarAbierto(false)}
+        onClose={() => { if (!bloqueo.current) setModalCalificarAbierto(false); }}
         title="Calificar experiencia de compra"
         description={`Cuéntanos cómo fue tu experiencia con el pedido N.° ${pedido.id}.`}
       >
@@ -166,6 +184,7 @@ export default function OrderActions({ pedido, rol, onDone }) {
                 <button
                   key={estrella}
                   type="button"
+                  disabled={ocupado}
                   role="radio"
                   aria-checked={puntaje === estrella}
                   aria-label={`${estrella} estrella${estrella > 1 ? "s" : ""}`}
@@ -190,6 +209,8 @@ export default function OrderActions({ pedido, rol, onDone }) {
               Comentario opcional
             </label>
             <textarea
+              disabled={ocupado}
+              maxLength={1000}
               id="comentario-calificacion"
               rows={3}
               value={comentario}

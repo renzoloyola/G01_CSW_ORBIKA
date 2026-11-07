@@ -6,6 +6,17 @@ export async function subirImagen(actor, bytes, mime, db = supabaseAdmin) {
   if (actor?.rol !== "vendedor" || actor.activo === false) {
     throw new AppError(403, "FORBIDDEN", "Solo un vendedor habilitado puede subir imágenes.");
   }
+  return almacenarImagen(actor, bytes, mime, db, "orbika-productos");
+}
+
+// La foto del perfil se guarda separada de las imágenes de productos y bajo la carpeta del titular.
+export async function subirFotoPerfil(actor, bytes, mime, db = supabaseAdmin) {
+  if (!actor?.id) throw new AppError(401, "UNAUTHORIZED", "Inicia sesión para subir tu fotografía.");
+  return almacenarImagen(actor, bytes, mime, db, "orbika-perfiles");
+}
+
+async function almacenarImagen(actor, bytes, mime, db, nombreBucket) {
+  // Comprueba firma y tipo real del archivo para rechazar contenido que solo simula ser una imagen.
   if (!Buffer.isBuffer(bytes) || !bytes.length) {
     throw new AppError(400, "INVALID_IMAGE", "Debes enviar una imagen JPG o PNG.");
   }
@@ -18,7 +29,7 @@ export async function subirImagen(actor, bytes, mime, db = supabaseAdmin) {
     throw new AppError(400, "INVALID_IMAGE", "El archivo debe ser JPG o PNG y coincidir con su formato.");
   }
   const path = `${actor.id}/${randomUUID()}.${png ? "png" : "jpg"}`;
-  const bucket = db.storage.from("orbika-productos");
+  const bucket = db.storage.from(nombreBucket);
   const { error } = await bucket.upload(path, bytes, { contentType: mime, upsert: false });
   if (error) throw new AppError(502, "IMAGE_UPLOAD_FAILED", "No se pudo almacenar la imagen. Intenta nuevamente.");
   const { data } = bucket.getPublicUrl(path);

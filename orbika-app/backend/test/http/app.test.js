@@ -18,9 +18,21 @@ beforeEach(() => {
     : query({ id: 1, comprador_id: "buyer", estado: "entregado", detalle_pedidos: [{ productos: { vendedor_id: "seller" } }] }));
 });
 describe("API HTTP con autenticación y persistencia controladas", () => {
+  it("el perfil exige sesión y no admite una identidad ajena ni cambios de rol", async () => {
+    expect((await request(app).patch("/api/perfil").send({ nombre: "Nombre" })).status).toBe(401);
+    for (const input of [{ id: "other", nombre: "Nombre" }, { rol: "administrador" }]) {
+      expect((await request(app).patch("/api/perfil").set("Authorization", "Bearer buyer").send(input)).status).toBe(400);
+    }
+    expect((await request(app).patch("/api/perfil/other").set("Authorization", "Bearer buyer").send({ nombre: "Nombre" })).status).toBe(404);
+  });
   it("comprar sin sesión devuelve 401", async () => {
     expect((await request(app).post("/api/pedidos").send({})).status).toBe(401);
     expect(db.rpc).not.toHaveBeenCalled();
+  });
+  it("foto de perfil: exige sesión y valida formato y tamaño para compradores", async () => {
+    expect((await request(app).post("/api/perfil/foto").set("Content-Type", "image/png").send(Buffer.from("fake"))).status).toBe(401);
+    expect((await request(app).post("/api/perfil/foto").set("Authorization", "Bearer buyer").set("Content-Type", "image/png").send(Buffer.from("fake"))).status).toBe(400);
+    expect((await request(app).post("/api/perfil/foto").set("Authorization", "Bearer buyer").set("Content-Type", "image/png").send(Buffer.alloc(5 * 1024 * 1024 + 1))).status).toBe(413);
   });
   it("un comprador no puede publicar", async () => {
     expect((await request(app).post("/api/productos").set("Authorization", "Bearer buyer").send({})).status).toBe(403);

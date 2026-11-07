@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:sprint4": "node scripts/test-sprint4-concurrency.js",
     "check:data": "node scripts/check-read-model.js",
-    "seed:demo": "node scripts/seed-demo.js"
+    "seed:demo": "node scripts/seed-demo.js",
+    "test:sprints56": "node scripts/test-sprint4-concurrency.js --sprint56"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

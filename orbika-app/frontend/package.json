@@ -11,7 +11,8 @@
     "test:browser": "node test/browser-smoke.mjs",
     "test:sprint3": "node test/browser-smoke.mjs --sprint3",
     "test:sprint4": "node test/browser-smoke.mjs --sprint4",
-    "test:performance:live": "node test/performance-live.mjs"
+    "test:performance:live": "node test/performance-live.mjs",
+    "test:sprints56": "node test/browser-smoke.mjs --sprint56"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -41,6 +41,7 @@ beforeAll(async () => {
   await db.exec(readFileSync(new URL("../../../supabase/migrations/003_srs_integrity_and_images.sql", import.meta.url), "utf8"));
   await db.exec("create view public.descuentos_compatibilidad as select id,descuento_pct from public.productos_con_descuento; grant select on public.productos_con_descuento to authenticated;");
   await db.exec(readFileSync(new URL("../../../supabase/migrations/004_discount_precision.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../../../supabase/migrations/005_profile_contact.sql", import.meta.url), "utf8"));
   await db.exec("grant select,update on public.perfiles to authenticated; grant select on public.pedidos,public.detalle_pedidos,public.productos to authenticated;");
 }, 30000);
 beforeEach(async () => {
@@ -52,8 +53,6 @@ afterEach(async () => { await db.exec("rollback;"); });
 afterAll(async () => { if (db) await db.close(); });
 
 describe("migraciones ejecutadas en PostgreSQL", () => {
-<<<<<<< HEAD
-=======
   it("RF-05: ejecuta los filtros combinados del servicio sobre ofertas persistidas", async () => {
     await db.query("update productos set zona='Tacna' where id=$1", [productoId]);
     await db.query(`insert into productos(vendedor_id,categoria_id,nombre,precio_original,precio_actual,fecha_vencimiento,stock,zona)
@@ -77,7 +76,6 @@ describe("migraciones ejecutadas en PostgreSQL", () => {
     const ordered = await buscarProductos({ ...filtros, maxPrecio: 10 }, adapter);
     expect(ordered.map((p) => Number(p.precio_actual))).toEqual([5, 7]);
   });
->>>>>>> b8cc668 (App con 4 sprints + semana 1 y 2)
   it("calcula el descuento con un decimal sin eliminar la vista ni sus dependencias", async () => {
     await db.query("update productos set precio_original=7,precio_actual=4 where id=$1", [productoId]);
     const row = (await db.query("select descuento_pct,descuento_pct_entero,estado from productos_con_descuento where id=$1", [productoId])).rows[0];
@@ -158,6 +156,34 @@ describe("migraciones ejecutadas en PostgreSQL", () => {
     for (let i = 0; i < 2; i++) await db.query("select * from cancelar_pedido_transaccion($1,$2,'Cambio de planes')", [pedido.id, buyer]);
     expect(await stock()).toBe(3);
     expect(Number((await db.query("select count(*) as n from notificaciones")).rows[0].n)).toBe(2);
+  });
+  it.each(["creado", "preparando"])("S5: cancela %s con fecha y motivo trazables", async estado => {
+    const pedido = await buy(productoId, 2);
+    await db.query("update pedidos set estado=$1 where id=$2", [estado, pedido.id]);
+    const result = await db.query("select * from cancelar_pedido_transaccion($1,$2,'No podré recogerlo')", [pedido.id, buyer]);
+    expect(result.rows[0]).toMatchObject({ estado: "cancelado", motivo_cancelacion: "No podré recogerlo" });
+    expect(result.rows[0].fecha_cancelacion).toBeTruthy();
+    expect(await stock()).toBe(3);
+  });
+  it("S5: rechaza cancelar entregado sin reponer stock", async () => {
+    const pedido = await buy(productoId, 2);
+    await db.query("update pedidos set estado='entregado' where id=$1", [pedido.id]);
+    await db.exec("savepoint cancelacion");
+    await expect(db.query("select * from cancelar_pedido_transaccion($1,$2,'Motivo')", [pedido.id, buyer])).rejects.toThrow();
+    await db.exec("rollback to savepoint cancelacion");
+    expect(await stock()).toBe(1);
+  });
+  it("S6: la base impide dos calificaciones del mismo pedido", async () => {
+    const pedido = await buy();
+    await db.query("update pedidos set estado='completado' where id=$1", [pedido.id]);
+    await db.query("insert into calificaciones(pedido_id,puntaje) values($1,5)", [pedido.id]);
+    await expect(db.query("insert into calificaciones(pedido_id,puntaje) values($1,4)", [pedido.id])).rejects.toThrow();
+  });
+  it("S6: la política permite editar el propio perfil y excluye el ajeno", async () => {
+    await db.exec("set local role authenticated");
+    await db.query("select set_config('request.jwt.claim.sub',$1,true)", [buyer]);
+    expect((await db.query("update perfiles set nombre='Nuevo nombre' where id=$1 returning id", [buyer])).rows).toHaveLength(1);
+    expect((await db.query("update perfiles set nombre='Intruso' where id=$1 returning id", [seller])).rows).toHaveLength(0);
   });
   it("cancelar no reactiva una publicación retirada", async () => {
     const pedido = await buy();

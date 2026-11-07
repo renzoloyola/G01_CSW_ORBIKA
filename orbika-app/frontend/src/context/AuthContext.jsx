@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
+import { api } from "../services/api";
 import { DEMO_MODE } from "../services/marketplace";
 import { normalizarRolPublico, rutaRecuperacion } from "./auth.helpers";
 
@@ -100,7 +101,16 @@ export function AuthProvider({ children }) {
     if (cierreError) throw cierreError;
   }
 
+  async function guardarPerfil(datos) {
+    // Guarda el perfil asociado a la sesión y actualiza la navegación tras confirmar la API.
+    exigirModoNormal();
+    const { data } = await api.patch("/perfil", datos);
+    setPerfil((actual) => actual?.id === data.id ? data : actual);
+    return data;
+  }
+
   const value = {
+    guardarPerfil,
     session,
     usuario: session?.user ?? null,
     perfil,

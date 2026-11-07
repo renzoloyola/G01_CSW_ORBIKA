@@ -3,6 +3,7 @@ import cors from "cors";
 import productoRoutes from "./routes/producto.routes.js";
 import imagenRoutes from "./routes/imagen.routes.js";
 import pedidoRoutes from "./routes/pedido.routes.js";
+import perfilRoutes from "./routes/perfil.routes.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 
 export function createApp() {
@@ -13,6 +14,7 @@ export function createApp() {
   app.get("/api/salud", (_req, res) => res.json({ ok: true, servicio: "ÓrbiKa API" }));
   app.use("/api/productos", productoRoutes);
   app.use("/api/pedidos", pedidoRoutes);
+  app.use("/api/perfil", perfilRoutes);
   app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada.", code: "NOT_FOUND" }));
   app.use(errorHandler);
   return app;

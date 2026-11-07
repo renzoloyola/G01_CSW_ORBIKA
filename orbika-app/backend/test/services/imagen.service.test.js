@@ -1,8 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
-import { subirImagen } from "../../src/services/imagen.service.js";
+import { subirImagen, subirFotoPerfil } from "../../src/services/imagen.service.js";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aMesAAAAASUVORK5CYII=", "base64");
 const seller = { id: "seller", rol: "vendedor" };
 describe("imágenes de producto", () => {
+  it("un comprador guarda su foto en su propia carpeta y bucket de perfiles", async () => {
+    const bucket = { upload: vi.fn().mockResolvedValue({error:null}), getPublicUrl: () => ({data:{publicUrl:"https://example.test/buyer/foto.png"}}) };
+    const storage = {from:vi.fn(()=>bucket)};
+    await subirFotoPerfil({id:"buyer",rol:"comprador"},png,"image/png",{storage});
+    expect(storage.from).toHaveBeenCalledWith("orbika-perfiles");
+    expect(bucket.upload).toHaveBeenCalledWith(expect.stringMatching(/^buyer\/.+\.png$/),png,expect.any(Object));
+  });
   it("almacena la imagen con un nombre único y devuelve su URL", async () => {
     const bucket = { upload: vi.fn().mockResolvedValue({ error: null }), getPublicUrl: vi.fn(() => ({ data: { publicUrl: "https://example.test/foto.png" } })) };
     const storage = { from: vi.fn(() => bucket) };

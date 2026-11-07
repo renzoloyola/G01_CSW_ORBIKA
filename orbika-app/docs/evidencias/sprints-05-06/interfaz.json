@@ -1,0 +1,9 @@
+{
+  "fecha": "2026-11-03T01:59:09.431Z",
+  "entorno": "Edge, API y Auth simuladas",
+  "casos": [
+    "Perfil buyer: error, guardado, recarga y móvil",
+    "Cancelación y calificación persistida; acciones repetidas ocultas",
+    "Perfil seller: error, guardado, recarga y móvil"
+  ]
+}

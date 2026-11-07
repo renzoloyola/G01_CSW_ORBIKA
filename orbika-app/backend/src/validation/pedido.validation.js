@@ -1,6 +1,7 @@
 import { datoInvalido, enteroPositivo, texto } from "./common.validation.js";
 
 export const TRANSICIONES_PEDIDO = Object.freeze({
+  // Define el flujo permitido. La cancelación se procesa por su función transaccional propia.
   creado: ["preparando"],
   preparando: ["listo_para_entrega"],
   listo_para_entrega: ["entregado"],
@@ -10,6 +11,7 @@ export const TRANSICIONES_PEDIDO = Object.freeze({
 });
 
 export function validarCompra(input) {
+  // Rechaza valores incompatibles con las columnas numéricas y los límites de PostgreSQL.
   for (const campo of ["productoId", "cantidad"]) {
     const valor = input?.[campo];
     if (!["number", "string"].includes(typeof valor) || !Number.isSafeInteger(Number(valor))
@@ -50,6 +52,8 @@ export function validarCambioEstado(input) {
 }
 
 export function validarCalificacion(input) {
+  // Puntaje y comentario se normalizan antes de llegar a la base de datos.
+  if (!["number", "string"].includes(typeof input?.puntaje)) throw datoInvalido("El puntaje debe ser un entero entre 1 y 5.");
   const puntaje = enteroPositivo(input?.puntaje, "puntaje");
   if (puntaje > 5) throw datoInvalido("El puntaje debe estar entre 1 y 5.");
   return {

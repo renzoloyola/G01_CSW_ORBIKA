@@ -22,6 +22,7 @@ function pedidoConfirmado(data) {
 }
 
 export async function crearPedido(actor, input, db = supabaseAdmin) {
+  // Valida al comprador y delega el descuento atómico de stock a PostgreSQL.
   exigirRol(actor, "comprador");
   const datos = validarCompra(input);
   if (actor.activo === false) throw new AppError(403, "FORBIDDEN", "La cuenta no está habilitada para nuevas compras.");
@@ -41,8 +42,8 @@ export async function listarPedidosDeUsuario(usuarioId, rol, db = supabaseAdmin)
   if (!["comprador", "vendedor"].includes(rol)) throw new AppError(403, "FORBIDDEN", "No tienes acceso a pedidos.");
   let query = db.from("pedidos");
   const relacion = rol === "vendedor"
-    ? "*, detalle_pedidos!inner(*, productos!inner(nombre, foto_url, vendedor_id))"
-    : "*, detalle_pedidos!inner(*, productos(nombre, foto_url, vendedor_id))";
+    ? "*, calificaciones(*), detalle_pedidos!inner(*, productos!inner(nombre, foto_url, vendedor_id))"
+    : "*, calificaciones(*), detalle_pedidos!inner(*, productos(nombre, foto_url, vendedor_id))";
   query = query.select(relacion);
   if (rol === "vendedor") query = query.eq("detalle_pedidos.productos.vendedor_id", usuarioId);
   else if (rol === "comprador") query = query.eq("comprador_id", usuarioId);
@@ -63,6 +64,7 @@ export async function listarPedidosDeUsuario(usuarioId, rol, db = supabaseAdmin)
 }
 
 export async function cancelarPedido(pedidoId, actor, motivo, db = supabaseAdmin) {
+  // La función SQL registra el motivo y repone las unidades una sola vez.
   exigirRol(actor, "comprador");
   const id = Number(pedidoId);
   if (!Number.isInteger(id) || id <= 0) throw new AppError(400, "VALIDATION_ERROR", "Pedido inválido.");
@@ -75,6 +77,7 @@ export async function cancelarPedido(pedidoId, actor, motivo, db = supabaseAdmin
 }
 
 export async function actualizarEstadoPedido(pedidoId, actor, nuevoEstado, db = supabaseAdmin) {
+  // Comprueba participante y transición antes de guardar el nuevo estado.
   if (!["comprador", "vendedor"].includes(actor?.rol)) throw new AppError(403, "FORBIDDEN", "No tienes acceso a pedidos.");
   const id = Number(pedidoId);
   if (!Number.isInteger(id) || id <= 0) throw new AppError(400, "VALIDATION_ERROR", "Pedido inválido.");
@@ -101,6 +104,7 @@ export async function actualizarEstadoPedido(pedidoId, actor, nuevoEstado, db = 
 }
 
 export async function calificarPedido(pedidoId, actor, puntaje, comentario, db = supabaseAdmin) {
+  // Solo el comprador titular puede evaluar un pedido que ya recibió.
   exigirRol(actor, "comprador");
   const id = Number(pedidoId);
   if (!Number.isInteger(id) || id <= 0) throw new AppError(400, "VALIDATION_ERROR", "Pedido inválido.");
@@ -111,7 +115,8 @@ export async function calificarPedido(pedidoId, actor, puntaje, comentario, db =
   if (pedido.comprador_id !== actor.id) throw new AppError(403, "FORBIDDEN", "Este pedido no te pertenece.");
   if (pedido.estado !== "completado") throw conflicto(null, "Solo se puede calificar un pedido completado.");
   const { data, error } = await db.from("calificaciones").insert({ pedido_id: id, ...datos }).select().single();
-  if (error) throw conflicto(error, "Este pedido ya fue calificado.");
+  if (error?.code === "23505") throw conflicto(error, "Este pedido ya fue calificado.");
+  if (error || !data) throw new AppError(502, "RATING_SAVE_FAILED", "No se pudo guardar la calificación. Reintenta.");
   return data;
 }
 

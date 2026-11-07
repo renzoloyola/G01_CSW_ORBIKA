@@ -8,6 +8,7 @@ import { Button, StatePanel, SkeletonOrder } from "../components/ui";
 import { usePageTitle } from "../hooks/usePageTitle";
 
 export default function MyOrders() {
+  // El perfil decide si se muestran compras del comprador o ventas del vendedor.
   const { perfil } = useAuth();
   const esVendedor = perfil?.rol === "vendedor";
   usePageTitle(esVendedor ? "Mis ventas y pedidos" : "Mis compras y pedidos");
@@ -20,6 +21,7 @@ export default function MyOrders() {
   const solicitud = useRef(0);
 
   const cargar = useCallback(async () => {
+    // Invalida respuestas pendientes para que un cambio de cuenta no mezcle historiales.
     const actual = ++solicitud.current;
     setCargando(true);
     setPedidos([]);
@@ -125,7 +127,7 @@ export default function MyOrders() {
         <OrderSummary pedidos={pedidos} rol={perfil?.rol} />
       )}
 
-      {/* Pestañas de filtrado por estado */}
+      {/* Las pestañas resumen y filtran todos los pedidos ya cargados. */}
       {!cargando && !error && pedidos.length > 0 && (
         <div
           className="flex items-center gap-2 overflow-x-auto pb-2 mb-6 border-b border-sage/30 no-scrollbar"

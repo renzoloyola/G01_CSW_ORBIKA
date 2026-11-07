@@ -126,9 +126,11 @@ export default function Navbar() {
             </Link>
           )}
 
+          {/* El enlace al perfil y el nombre de cuenta reflejan la sesión actual. */}
           {usuario ? (
             <div className="flex items-center gap-3 pl-2 border-l border-forest-deep/60">
-              <div className="flex flex-col items-end">
+                <div className="flex flex-col items-end">
+                  <Link to="/mi-perfil" className="text-xs text-amber hover:underline">Mi perfil</Link>
                 <span className="text-xs font-semibold text-white truncate max-w-[140px]">
                   {perfil?.nombre || usuario.email}
                 </span>
@@ -206,7 +208,8 @@ export default function Navbar() {
         <div className="md:hidden border-t border-forest-deep bg-forest-deep/95 backdrop-blur-md px-4 py-4 space-y-3 shadow-xl animate-in slide-in-from-top-2 duration-150">
           {usuario && (
             <div className="pb-3 border-b border-forest/60">
-              <p className="text-xs text-sage-pale/80">Sesión iniciada como</p>
+                <Link to="/mi-perfil" className="text-amber hover:underline" onClick={() => setMenuAbierto(false)}>Mi perfil</Link>
+                <p className="text-xs text-sage-pale/80">Sesión iniciada como</p>
               <p className="font-semibold text-white truncate text-sm mt-0.5">
                 {perfil?.nombre || usuario.email}
               </p>
@@ -276,7 +279,8 @@ export default function Navbar() {
           </div>
 
           <div className="pt-3 border-t border-forest/60">
-            {usuario ? (
+          {/* El menú móvil ofrece las mismas rutas principales y opciones de cuenta. */}
+          {usuario ? (
               <Button
                 variant="secondary"
                 fullWidth

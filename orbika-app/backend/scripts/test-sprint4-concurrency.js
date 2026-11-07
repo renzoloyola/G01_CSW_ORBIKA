@@ -46,7 +46,7 @@ try {
     create function auth.role() returns text language sql stable as $$select current_setting('request.jwt.claim.role',true)$$;
     grant usage on schema public,auth to anon,authenticated,service_role;
     create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);`);
-  for (const migration of ['001_init_schema.sql','002_security_and_order_transactions.sql','003_srs_integrity_and_images.sql','004_discount_precision.sql']) {
+  for (const migration of ['001_init_schema.sql','002_security_and_order_transactions.sql','003_srs_integrity_and_images.sql','004_discount_precision.sql','005_profile_contact.sql']) {
     await admin.query(await readFile(path.join(root,'../supabase/migrations',migration),'utf8'));
   }
   await admin.query(`insert into auth.users(id,email,raw_user_meta_data) values ($1,'seller@example.test','{"rol":"vendedor"}'),($2,'buyer@example.test','{}'),($3,'other@example.test','{}');`,[seller,buyer,other]);
@@ -127,8 +127,30 @@ try {
   evidence.push({caso:'POST /api/pedidos con SQL real e identidad ficticia',antes:apiBefore,
     compra:{status:created.status,body:created.body},despues:apiAfter,
     sobrestock:{status:conflict.status,body:conflict.body},despuesDelConflicto:await snapshot(id)});
+  if (process.argv.includes('--sprint56')) {
+    id = await product(3);
+    const pending = await buy(a,id,2,80);
+    const cancel = async c => (await c.query("select * from cancelar_pedido_transaccion($1,$2,'Cambio de planes')",[pending.id,buyer])).rows[0];
+    const canceled = await concurrent(id,[()=>cancel(a),()=>cancel(b)]);
+    assert(canceled.every(r=>r.status==='fulfilled' && r.value.estado==='cancelado'));
+    assert.deepEqual(await snapshot(id),{stock:3,detalles:1,pedidos:1});
+    const notices = await admin.query("select count(*)::int as n from notificaciones where mensaje=$1",['Pedido N.° '+pending.id+' cancelado por el comprador']);
+    assert.equal(notices.rows[0].n,1);
+    evidence.push({caso:'S5: cancelaciones simultáneas',antes:{stock:1,estado:'creado'},despues:{stock:3,estado:'cancelado'},avisos:1});
+    id = await product(3);
+    const delivered = await buy(a,id,2,81);
+    await admin.query("update pedidos set estado='entregado' where id=$1",[delivered.id]);
+    await assert.rejects(a.query("select * from cancelar_pedido_transaccion($1,$2,'Motivo')",[delivered.id,buyer]));
+    assert.equal((await snapshot(id)).stock,1);
+    evidence.push({caso:'S5: entregado rechazado',stockAntes:1,stockDespues:1});
+    await admin.query("update pedidos set estado='completado' where id=$1",[delivered.id]);
+    const ratings = await Promise.allSettled([a,b].map(c=>c.query('insert into calificaciones(pedido_id,puntaje) values($1,5) returning id',[delivered.id])));
+    assert.equal(ratings.filter(r=>r.status==='fulfilled').length,1);
+    assert.equal(ratings.filter(r=>r.status==='rejected' && r.reason.code==='23505').length,1);
+    evidence.push({caso:'S6: dos calificaciones simultáneas',registros:1,rechazos:1});
+  }
   const report={fecha:new Date().toISOString(),postgres:(await admin.query('select version() as version')).rows[0].version,entorno:'PostgreSQL local efímero, conexiones independientes; sin Supabase remoto',evidence};
-  const output=path.join(root,'../docs/evidencias/sprint-04'); await mkdir(output,{recursive:true});
+  const output=path.join(root,process.argv.includes('--sprint56') ? '../docs/evidencias/sprints-05-06' : '../docs/evidencias/sprint-04'); await mkdir(output,{recursive:true});
   await writeFile(path.join(output,'concurrencia.json'),JSON.stringify(report,null,2));
   console.log(JSON.stringify(report,null,2));
 } finally {

@@ -56,6 +56,7 @@ const ESTADOS = {
 };
 
 export default function OrderCard({ pedido, rol, onRefresh }) {
+  // Resume un pedido y entrega sus acciones al componente que valida permisos y cambios.
   const estadoConfig = ESTADOS[pedido.estado] || ESTADOS.creado;
   const esVendedor = rol === "vendedor";
 
@@ -85,7 +86,7 @@ export default function OrderCard({ pedido, rol, onRefresh }) {
             })}
           </p>
 
-          {/* Ficha técnica del pedido */}
+          {/* Cantidad, importe y modalidad corresponden a los datos guardados en el pedido. */}
           <div className="flex items-center gap-4 text-xs text-ink-soft pt-1 flex-wrap">
             <div className="bg-paper-warm/80 px-3 py-1.5 rounded-xl border border-sage/20">
               <span>Cantidad: </span>
@@ -125,6 +126,7 @@ export default function OrderCard({ pedido, rol, onRefresh }) {
           {pedido.motivo_cancelacion && (
             <div className="text-xs text-terra bg-terra-pale/60 px-3 py-2 rounded-xl border border-terra/30 mt-2">
               <strong>Motivo de cancelación:</strong> {pedido.motivo_cancelacion}
+              {pedido.fecha_cancelacion && <p>Cancelado el {new Date(pedido.fecha_cancelacion).toLocaleString("es-PE", { timeZone: "America/Lima" })}</p>}
             </div>
           )}
         </div>

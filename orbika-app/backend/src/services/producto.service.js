@@ -23,6 +23,7 @@ function aColumnas(datos) {
 }
 
 export async function buscarProductos(filtros = {}, db = supabaseAdmin, hoy = fechaHoyLima()) {
+  // Aplica categoría, búsqueda, zona, precio y disponibilidad en la consulta al catálogo.
   for (const campo of ["busqueda", "zona", "orden"]) {
     if (filtros[campo] != null && typeof filtros[campo] !== "string") {
       throw new AppError(400, "VALIDATION_ERROR", "Los filtros de búsqueda no son válidos.");
@@ -69,6 +70,7 @@ export async function obtenerProducto(id, db = supabaseAdmin) {
 }
 
 export async function publicarProducto(actor, input, db = supabaseAdmin) {
+  // Solo un vendedor habilitado puede crear una oferta con campos ya validados.
   exigirVendedor(actor);
   const datos = validarProductoNuevo(input);
   const { data, error } = await db.from("productos")
@@ -78,6 +80,7 @@ export async function publicarProducto(actor, input, db = supabaseAdmin) {
 }
 
 export async function editarProducto(id, actor, input, db = supabaseAdmin) {
+  // Verifica que el producto pertenezca al vendedor y que no haya cambiado durante la edición.
   exigirVendedor(actor);
   const productoId = idValido(id, "Producto");
   const cambios = validarEdicionProducto(input);

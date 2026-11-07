@@ -51,6 +51,7 @@ export default function ProductDetail() {
   const [compraIntento, setCompraIntento] = useState(null);
 
   function cargarDetalle() {
+    // Descarta respuestas antiguas si el usuario navega a otro producto durante la carga.
     const actual = ++solicitud.current;
     setCargando(true);
     setErrorCarga("");
@@ -78,6 +79,7 @@ export default function ProductDetail() {
   }, [id]);
 
   async function abrirModalCompra() {
+    // Revisa stock, precio, vigencia y modalidad antes de mostrar la confirmación.
     if (operacion.current) return;
     if (!cantidadValida(cantidad, producto?.stock || 0)) {
       setErrorCompra("Por favor selecciona una cantidad válida dentro del stock.");
@@ -127,6 +129,7 @@ export default function ProductDetail() {
   }
 
   async function ejecutarCompra() {
+    // La clave identifica el intento y permite reintentar sin crear pedidos duplicados.
     if (operacion.current || !compraIntento) return;
     operacion.current = true;
     const intento = compraIntento;
@@ -511,6 +514,7 @@ export default function ProductDetail() {
             </div>
 
             {/* Botón Principal de Compra */}
+            {/* Solo ofrece comprar a compradores habilitados y con una oferta disponible. */}
             {!usuario ? (
               <Link to="/iniciar-sesion" className="block text-center rounded-xl bg-forest text-white px-4 py-3 font-semibold">
                 Inicia sesión para comprar
@@ -583,6 +587,7 @@ export default function ProductDetail() {
       </div>
 
       {/* Modal Accesible de Confirmación de Pedido */}
+      {/* Muestra al comprador la cantidad y el importe antes de enviar la orden. */}
       <ConfirmModal
         isOpen={modalConfirmarAbierto}
         onClose={() => { if (!operacion.current) setModalConfirmarAbierto(false); }}

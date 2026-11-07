@@ -17,6 +17,7 @@ export default function ProductList() {
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [filtros, setFiltros] = useState(filtrosIniciales);
+  // "filtros" conserva lo que se está editando y "aplicados" controla los resultados.
   const [aplicados, setAplicados] = useState(filtrosIniciales);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -34,6 +35,7 @@ export default function ProductList() {
   }, [reintento]);
 
   function cargarCatalogo() {
+    // El contador descarta respuestas viejas si el usuario cambia los filtros mientras carga.
     const actual = ++solicitud.current;
     setCargando(true);
     setError("");
@@ -63,6 +65,7 @@ export default function ProductList() {
     setModalFiltrosAbierto(false);
   }
 
+  // La búsqueda y los campos de precio/zona se aplican al enviar el formulario.
   function limpiarFiltros() {
     setFiltros(filtrosIniciales);
     setAplicados(filtrosIniciales);
@@ -70,6 +73,7 @@ export default function ProductList() {
   }
 
   function seleccionarCategoria(catId) {
+    // La categoría se aplica en el acto sin borrar otros filtros ya aplicados.
     const categoriaId = String(catId);
     setFiltros((actual) => ({ ...actual, categoriaId }));
     setAplicados((actual) => ({ ...actual, categoriaId }));
@@ -143,6 +147,7 @@ export default function ProductList() {
                 )}
               </button>
 
+              {/* Envía juntos el nombre, la zona y el precio elegidos en escritorio. */}
               <Button
                 type="submit"
                 variant="primary"
@@ -232,7 +237,8 @@ export default function ProductList() {
                 <span className="text-ink-soft/70 font-semibold shrink-0 mr-1 hidden sm:inline">
                   Categorías:
                 </span>
-                <button
+              {/* Abre filtros completos en móvil. La selección se confirma en el modal. */}
+              <button
                   type="button"
                   onClick={() => seleccionarCategoria("")}
                   aria-pressed={!aplicados.categoriaId}
@@ -244,7 +250,7 @@ export default function ProductList() {
                 >
                   Todas
                 </button>
-                {categorias.map((c) => {
+                    {categorias.map((c) => {
                   const activa = aplicados.categoriaId === String(c.id);
                   return (
                     <button

@@ -7,9 +7,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { comprobarSprint3 } from "./sprint3-checks.mjs";
 import { comprobarSprint4 } from "./sprint4-checks.mjs";
+import { comprobarSprints56 } from "./sprints56-checks.mjs";
+const sprint56 = process.argv.includes("--sprint56");
 const sprint3 = process.argv.includes("--sprint3");
 const sprint4 = process.argv.includes("--sprint4");
-const produccion = sprint3 || sprint4;
+const produccion = sprint3 || sprint4 || sprint56;
 const buildDir = `test-results/sprint${sprint4 ? 4 : 3}-build`;
 const { chromium } = await import(process.env.ORBIKA_PLAYWRIGHT_ENTRYPOINT
   ? pathToFileURL(process.env.ORBIKA_PLAYWRIGHT_ENTRYPOINT).href : "playwright");
@@ -57,12 +59,9 @@ async function start(port, demo) {
 }
 async function setup(origin) {
   const context = await browser.newContext();
-<<<<<<< HEAD
-  const state = { actor: "buyer", signupMode: "pending", recoveryError: false, signupRequests: [], catalogo: [producto], catalogError: false, rejectCompra: true, rejectPublicacion: true, compras: [], publicaciones: [], imagenes: 0, apiCalls: 0, supabaseCalls: 0 };
-=======
   const state = { actor: "buyer", signupMode: "pending", recoveryError: false, signupRequests: [], catalogo: [producto], pedidos: [], pedidoError: false, categoriasError: false, catalogRequests: [], delay: 0, slowSearch: null, catalogError: false, rejectCompra: true, rejectPublicacion: true, compras: [], publicaciones: [], imagenes: 0, apiCalls: 0, supabaseCalls: 0 };
+  state.perfiles = {};
   state.comprasConfirmadas = new Map();
->>>>>>> b8cc668 (App con 4 sprints + semana 1 y 2)
   await context.route("**/*", async (route) => {
     const req = route.request(); const url = new URL(req.url());
     if (url.origin === origin) return route.continue();
@@ -86,12 +85,26 @@ async function setup(origin) {
       }
       if (url.pathname === "/auth/v1/recover") return state.recoveryError
         ? json({ msg: "Too many requests", code: "over_email_send_rate_limit" }, 429) : json({});
-      if (url.pathname === "/rest/v1/perfiles") return json({ id: state.actor, nombre: "Cuenta de prueba", rol: state.actor === "seller" ? "vendedor" : "comprador", activo: true });
+      if (url.pathname === "/rest/v1/perfiles") return json(state.perfiles[state.actor] || { id: state.actor, nombre: "Cuenta de prueba", rol: state.actor === "seller" ? "vendedor" : "comprador", activo: true });
       if (url.pathname === "/rest/v1/categorias") return state.categoriasError ? json({ message: "Error de categorías" }, 503) : json([{ id: 1, nombre: "Panadería" }, { id: 2, nombre: "Frutas" }]);
       return json({});
     }
     if (url.port === "4019") {
       state.apiCalls++;
+      if (url.pathname === '/api/perfil' && req.method() === 'PATCH') {
+        if (state.profileError) return json({error:'No se pudo guardar el perfil'},502);
+        state.perfiles[state.actor] = {id:state.actor,correo:`${state.actor}@example.test`,rol:state.actor === 'seller' ? 'vendedor' : 'comprador',activo:true,...req.postDataJSON()};
+        return json(state.perfiles[state.actor]);
+      }
+      if (url.pathname === '/api/perfil/foto') return json({url:'https://example.test/perfil.png'},201);
+      if (url.pathname.endsWith('/cancelar')) {
+        state.pedidos[0] = {...state.pedidos[0],estado:'cancelado',motivo_cancelacion:req.postDataJSON().motivo};
+        return json(state.pedidos[0]);
+      }
+      if (url.pathname.endsWith('/calificacion')) {
+        state.pedidos[0].calificaciones = [{id:1,...req.postDataJSON()}];
+        return json(state.pedidos[0].calificaciones[0],201);
+      }
       if (url.pathname === "/api/productos" && req.method() === "GET") {
         const f = Object.fromEntries(url.searchParams);
         state.catalogRequests.push(f);
@@ -229,14 +242,13 @@ try {
   const liveOrigin = await start(5187, false);
   const demoOrigin = produccion ? null : await start(5188, true);
   browser = await chromium.launch({ channel: process.env.ORBIKA_BROWSER_CHANNEL || "msedge", headless: true });
-<<<<<<< HEAD
-=======
-  if (sprint4) {
+  if (sprint56) {
+    await comprobarSprints56({origin:liveOrigin,setup,login,root});
+  } else if (sprint4) {
     await comprobarSprint4({ origin: liveOrigin, setup, login, producto, root });
   } else if (sprint3) {
     await comprobarSprint3({ origin: liveOrigin, setup, login, producto, browser, root });
   } else {
->>>>>>> b8cc668 (App con 4 sprints + semana 1 y 2)
   await comprobarSprint1(liveOrigin);
   const live = await setup(liveOrigin);
   const { page, state } = live;

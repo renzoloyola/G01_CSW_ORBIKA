@@ -1,8 +1,8 @@
 # ÓrbiKa
 
 Mercado web de alimentos perecibles para Tacna. El repositorio contiene una
-implementación parcial de 11 de los 21 casos de uso del SRS: acceso, catálogo,
-publicación, edición, compra, pedidos, cancelación y calificación. Los otros diez
+implementación parcial de 12 de los 21 casos de uso del SRS: acceso, catálogo,
+publicación, edición, compra, pedidos, cancelación y calificación. Los otros nueve
 casos requieren desarrollo; no se declara cumplimiento total ni validación en producción.
 
 La arquitectura implementada es React 18 + Vite + Tailwind, una API REST
@@ -22,6 +22,7 @@ contienen afirmaciones de alcance que deben sustituirse en una próxima entrega.
    - `supabase/migrations/002_security_and_order_transactions.sql`
    - `supabase/migrations/003_srs_integrity_and_images.sql`
    - `supabase/migrations/004_discount_precision.sql`
+   - `supabase/migrations/005_profile_contact.sql`
 3. Ejecutar opcionalmente `supabase/seed.sql` para cargar categorías.
 4. Copiar los archivos `.env.example` a `.env` en frontend y backend y completar
    las variables del proyecto. La clave `service_role` se usa solo en el backend.
@@ -171,12 +172,6 @@ Si Playwright se proporciona mediante un runtime externo, establecer
 `ORBIKA_PLAYWRIGHT_ENTRYPOINT` con la ruta absoluta a su `index.mjs`.
 `ORBIKA_BROWSER_CHANNEL` permite elegir el canal (predeterminado: `msedge`).
 
-<<<<<<< HEAD
-Antes del piloto se requiere aplicar las migraciones pendientes hasta 004 en Supabase de pruebas y validar allí
-PostgREST, autenticación real, Storage, recuperación por correo y compras
-simultáneas. Los resultados locales no acreditan rendimiento, disponibilidad
-mensual, aceptación de usuarios ni cumplimiento de los 21 casos de uso.
-=======
 El proyecto Supabase configurado se actualizó hasta 004 el 24/10/2026;
 el 25/10 se verificaron lecturas reales de ventas, catálogo y detalle. No repetir
 las migraciones ya aplicadas. En otro proyecto, comprobar primero su estado.
@@ -229,16 +224,17 @@ npm run test:sprint4
 La prueba nativa usa una base temporal local en `127.0.0.1:65439` y la apaga al
 terminar. No modifica Supabase remoto. Los informes y capturas de esta entrega
 están en `docs/evidencias/sprint-04`; la aceptación con cuentas reales sigue pendiente.
->>>>>>> b8cc668 (App con 4 sprints + semana 1 y 2)
 
-La trazabilidad y la aceptación pendiente de los primeros sprints están en
-[sprints-01-02.md](docs/sprints-01-02.md), organizadas en análisis, diseño,
-implementación y pruebas.
+## Sprints 5 y 6
+
+Cancelación controlada, calificación única y perfil editable implementados.
+Consulta [el informe y los pasos de instalación](docs/sprints-05-06.md).
+La migración 005 es necesaria para dirección y fotografía; aún no se aplicó al proyecto remoto.
 
 ## Funciones pendientes
 
 CU-09 estadísticas completas; CU-10 gestión de usuarios; CU-11 moderación;
-CU-12 reportes de impacto; CU-14 edición de perfil; CU-15 favoritos;
+CU-12 reportes de impacto; CU-15 favoritos;
 CU-16 mensajería; CU-18 reportes de productos; CU-20 gestión de categorías;
 CU-21 suscripciones premium. Estas funciones necesitan pantallas, endpoints y,
 según el caso, nuevas tablas y políticas; su modelo completo todavía no está migrado.

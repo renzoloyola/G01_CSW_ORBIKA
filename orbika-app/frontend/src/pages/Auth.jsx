@@ -24,6 +24,7 @@ export default function Auth({ initialMode = "login" }) {
   }, [location.pathname]);
 
   function cambiarModo(nuevoModo) {
+    // Cambia entre formularios sin navegar fuera de la pantalla de acceso.
     setModo(nuevoModo);
     navigate(nuevoModo === "register" ? "/registrarse" : "/iniciar-sesion", {
       replace: true,
@@ -40,6 +41,7 @@ export default function Auth({ initialMode = "login" }) {
   const [errorLogin, setErrorLogin] = useState("");
 
   async function onLogin(datos) {
+    // Valida credenciales con Supabase y muestra el resultado en el formulario.
     setErrorLogin("");
     setCargandoLogin(true);
     try {
@@ -71,6 +73,7 @@ export default function Auth({ initialMode = "login" }) {
   const [resultadoRegistro, setResultadoRegistro] = useState(null);
 
   async function onRegister(datos) {
+    // Crea la cuenta y presenta instrucciones según si Supabase abrió una sesión.
     setErrorRegister("");
     const errorVendedor = validarDatosVendedor(datos.rol, datos);
     if (errorVendedor) {
@@ -151,6 +154,7 @@ export default function Auth({ initialMode = "login" }) {
             aria-hidden="true"
           />
 
+          {/* Muestra el formulario de acceso. */}
           <button
             type="button"
             role="tab"
@@ -163,6 +167,7 @@ export default function Auth({ initialMode = "login" }) {
             Iniciar sesión
           </button>
 
+          {/* Muestra el formulario para crear una cuenta. */}
           <button
             type="button"
             role="tab"
@@ -288,6 +293,7 @@ export default function Auth({ initialMode = "login" }) {
                       role="radiogroup"
                       aria-label="Selecciona tu tipo de cuenta"
                     >
+                      {/* Registra un comprador con permisos para realizar pedidos. */}
                       <button
                         type="button"
                         role="radio"
@@ -302,6 +308,7 @@ export default function Auth({ initialMode = "login" }) {
                         Comprador
                       </button>
 
+                      {/* Registra un vendedor con acceso a publicación y gestión de ventas. */}
                       <button
                         type="button"
                         role="radio"

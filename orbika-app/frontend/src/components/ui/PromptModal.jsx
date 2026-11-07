@@ -29,6 +29,7 @@ export function PromptModal({
 
   function handleSubmit(e) {
     e.preventDefault();
+    if (loading) return;
     const trimmed = value.trim();
     if (required && !trimmed) {
       setError("Este campo es obligatorio.");
@@ -46,6 +47,8 @@ export function PromptModal({
         {multiline ? (
           <textarea
             rows={3}
+            disabled={loading}
+            maxLength={300}
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
@@ -58,6 +61,8 @@ export function PromptModal({
         ) : (
           <input
             type="text"
+            disabled={loading}
+            maxLength={300}
             value={value}
             onChange={(e) => {
               setValue(e.target.value);

@@ -1,0 +1,129 @@
+{
+  "fecha": "2026-11-03T01:57:12.610Z",
+  "postgres": "PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit",
+  "entorno": "PostgreSQL local efímero, conexiones independientes; sin Supabase remoto",
+  "evidence": [
+    {
+      "caso": "Compra válida con precio vigente y reintento",
+      "antes": {
+        "stock": 3,
+        "detalles": 0,
+        "pedidos": 0
+      },
+      "despues": {
+        "stock": 1,
+        "detalles": 1,
+        "pedidos": 1
+      },
+      "estado": "creado",
+      "monto": 8
+    },
+    {
+      "caso": "Cantidad superior al stock",
+      "resultado": "409",
+      "antes": {
+        "stock": 1,
+        "detalles": 1,
+        "pedidos": 1
+      },
+      "despues": {
+        "stock": 1,
+        "detalles": 1,
+        "pedidos": 1
+      }
+    },
+    {
+      "caso": "Dos compradores concurrentes piden 2 de las mismas 3 unidades",
+      "conexionesBloqueadas": 2,
+      "resultados": [
+        "éxito",
+        "409"
+      ],
+      "antes": {
+        "stock": 3
+      },
+      "despues": {
+        "stock": 1,
+        "detalles": 1,
+        "pedidos": 1
+      }
+    },
+    {
+      "caso": "Misma clave enviada desde dos conexiones simultáneas",
+      "mismoPedido": true,
+      "antes": {
+        "stock": 3
+      },
+      "despues": {
+        "stock": 1,
+        "detalles": 1,
+        "pedidos": 1
+      }
+    },
+    {
+      "caso": "POST /api/pedidos con SQL real e identidad ficticia",
+      "antes": {
+        "stock": 3,
+        "detalles": 0,
+        "pedidos": 0
+      },
+      "compra": {
+        "status": 201,
+        "body": {
+          "id": "4",
+          "comprador_id": "22222222-2222-4222-8222-222222222222",
+          "producto_id_legacy": null,
+          "cantidad": 2,
+          "monto_total": "10.00",
+          "modalidad_entrega": "recojo",
+          "referencia_entrega": null,
+          "estado": "creado",
+          "motivo_cancelacion": null,
+          "fecha_creacion": "2026-11-03T01:57:12.564Z",
+          "fecha_cancelacion": null,
+          "fecha_finalizacion": null,
+          "clave_idempotencia": "aaaaaaaa-aaaa-4aaa-8aaa-000000000006"
+        }
+      },
+      "despues": {
+        "stock": 1,
+        "detalles": 1,
+        "pedidos": 1
+      },
+      "sobrestock": {
+        "status": 409,
+        "body": {
+          "error": "Producto no disponible, vencido o sin stock suficiente",
+          "code": "DATA_CONFLICT"
+        }
+      },
+      "despuesDelConflicto": {
+        "stock": 1,
+        "detalles": 1,
+        "pedidos": 1
+      }
+    },
+    {
+      "caso": "S5: cancelaciones simultáneas",
+      "antes": {
+        "stock": 1,
+        "estado": "creado"
+      },
+      "despues": {
+        "stock": 3,
+        "estado": "cancelado"
+      },
+      "avisos": 1
+    },
+    {
+      "caso": "S5: entregado rechazado",
+      "stockAntes": 1,
+      "stockDespues": 1
+    },
+    {
+      "caso": "S6: dos calificaciones simultáneas",
+      "registros": 1,
+      "rechazos": 1
+    }
+  ]
+}

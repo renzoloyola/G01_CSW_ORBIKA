@@ -77,6 +77,7 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
   const vencimiento = fechaVenc ? calcularEstadoVencimiento(fechaVenc) : null;
 
   function autocompletarDatosDemo() {
+    // Llena campos de ejemplo para la demostración sin publicar hasta enviar el formulario.
     const d = new Date();
     d.setDate(d.getDate() + 2);
     const fecha = d.toISOString().slice(0, 10);
@@ -96,6 +97,7 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
   }
 
   function manejarSubidaArchivo(e) {
+    // Comprueba tipo y tamaño antes de conservar la imagen para enviarla a Storage.
     const archivo = e.target.files?.[0];
     if (!archivo) return;
     if (!["image/jpeg", "image/png"].includes(archivo.type) || archivo.size > 5 * 1024 * 1024) {
@@ -109,6 +111,7 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
   }
 
   async function enviar(values) {
+    // Guarda primero la imagen y envía al servidor los campos ya normalizados.
     setError("");
     setGuardando(true);
     try {
@@ -358,6 +361,7 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
           />
 
           <div className="flex flex-wrap gap-2">
+            {/* Abre el selector de archivos del equipo. */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -371,6 +375,7 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
               <span>Subir imagen desde mi equipo</span>
             </button>
 
+            {/* Elimina la foto actualmente elegida, ya sea archivo o URL. */}
             {(fotoUrl || vistaPrevia) && (
               <button
                 type="button"
@@ -388,6 +393,7 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
               O selecciona una foto rápida de catálogo:
             </label>
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {/* Cada opción permite seleccionar una imagen de ejemplo. */}
               {FOTOS_SUGERIDAS.map((item, idx) => (
                 <button
                   key={idx}
@@ -460,6 +466,7 @@ export default function ProductForm({ initialValues, onSave, submitLabel = "Guar
       )}
 
       <div className="pt-2">
+        {/* Envía la publicación o los cambios cuando todos los campos son válidos. */}
         <Button
           type="submit"
           variant="primary"

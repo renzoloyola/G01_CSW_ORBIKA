@@ -15,6 +15,7 @@ const MyOrders = lazy(() => import("./pages/MyOrders"));
 const UpdatePassword = lazy(() => import("./pages/UpdatePassword"));
 const EditProduct = lazy(() => import("./pages/EditProduct"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Profile = lazy(() => import("./pages/Profile"));
 
 export default function App() {
   return (
@@ -42,6 +43,7 @@ export default function App() {
           <Route path="/registrarse" element={<Register />} />
           <Route path="/recuperar-contrasena" element={<RecoverPassword />} />
           <Route path="/actualizar-contrasena" element={<UpdatePassword />} />
+          <Route path="/mi-perfil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route
             path="/publicar"
             element={

@@ -1,5 +1,7 @@
 # Estado de implementación de ÓrbiKa
 
+Actualización del 02/11/2026: [sprints 5 y 6](sprints-05-06.md) incorporan perfil editable (CU-14), fotografía/dirección, visualización de la calificación registrada y controles de cancelación. La migración 005 está probada localmente y pendiente de aplicar en Supabase remoto. Las referencias posteriores a CU-14 pendiente corresponden al estado histórico.
+
 Actualización del 30/10/2026: el [sprint 4](sprint-04.md) completa las comprobaciones
 locales de RF-07, refuerza la confirmación de compra y la validación de cantidad,
 y consulta el stock persistido después de comprar. Se verificaron bloqueos y
